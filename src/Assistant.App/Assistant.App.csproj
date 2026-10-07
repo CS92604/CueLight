@@ -24,6 +24,8 @@
     <PackageReference Include="System.Drawing.Common" Version="8.0.31" />
     <PackageReference Include="Whisper.net" Version="1.9.1" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+    <!-- For CPUs without AVX2 (older and some low-end PCs): Whisper.net picks this one automatically. -->
+    <PackageReference Include="Whisper.net.Runtime.NoAvx" Version="1.9.1" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Assistant.App.Tests" />
@@ -35,11 +37,15 @@
     <ProjectReference Include="..\Assistant.Core\Assistant.Core.csproj" />
   </ItemGroup>
 
-  <!-- Keep the Windows download lean: the speech runtime ships native libraries for every OS. -->
+  <!-- Keep the Windows download lean: the speech runtime ships native libraries for every OS.
+       Only the 64-bit Windows ones stay: the normal build (runtimes/win-x64) and the one for CPUs
+       without AVX2 (runtimes/noavx/win-x64). -->
   <Target Name="PruneForeignRuntimes" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' == 'win-x64'">
     <ItemGroup>
       <ForeignRuntime Include="$([System.IO.Directory]::GetDirectories('$(PublishDir)runtimes'))" />
-      <ForeignRuntime Remove="@(ForeignRuntime)" Condition="'%(Filename)%(Extension)' == 'win-x64'" />
+      <ForeignRuntime Remove="@(ForeignRuntime)" Condition="'%(Filename)%(Extension)' == 'win-x64' Or '%(Filename)%(Extension)' == 'noavx'" />
+      <ForeignRuntime Include="$([System.IO.Directory]::GetDirectories('$(PublishDir)runtimes/noavx'))" Condition="Exists('$(PublishDir)runtimes/noavx')" />
+      <ForeignRuntime Remove="@(ForeignRuntime)" Condition="'%(Filename)%(Extension)' == 'win-x64' And $([System.String]::Copy('%(FullPath)').Contains('noavx'))" />
     </ItemGroup>
     <RemoveDir Directories="@(ForeignRuntime)" />
   </Target>

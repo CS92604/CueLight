@@ -3,6 +3,9 @@ namespace Assistant.Core;
 /// <summary>A small grayscale picture of the watched area, used only for change detection.</summary>
 public sealed record GrayFrame(int Width, int Height, float[] Data)
 {
+    /// <summary>Every pixel is (near) black, as when the screen is locked or the content is protected.</summary>
+    public bool IsBlack => Data.All(v => v < 1f);
+
     /// <summary>Area-averaged downsample of a BGRA bitmap so thin text strokes survive.</summary>
     public static GrayFrame FromBgra(ReadOnlySpan<byte> bgra, int width, int height, int targetWidth = 160)
     {

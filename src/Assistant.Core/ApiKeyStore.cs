@@ -60,14 +60,16 @@ public sealed class ApiKeyStore
     public void Save(string apiKey)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        File.WriteAllBytes(_path, _protector.Protect(Encoding.UTF8.GetBytes(apiKey.Trim())));
+        var temp = _path + ".tmp";
+        File.WriteAllBytes(temp, _protector.Protect(Encoding.UTF8.GetBytes(apiKey.Trim())));
         if (!OperatingSystem.IsWindows())
-            File.SetUnixFileMode(_path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        File.Move(temp, _path, overwrite: true);
     }
 
     public void Delete()
     {
-        try { File.Delete(_path); } catch (IOException) { }
+        try { File.Delete(_path); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     /// <summary>"sk-ant-…a1b2": enough to recognise the key, not enough to use it.</summary>

@@ -79,8 +79,24 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public bool ProgressVisible => IsRecording && ShowProgress;
     public bool RetryVisible => IsRecording && CanRetry;
 
+    // Hover text for the buttons Recording turns off: when it's off they say why.
+    public string SendTip => IsRecording
+        ? "Get suggestions now. Claude replies to what has been said (and to the text area, if Type is on). Anything typed in the box is used as direction."
+        : "Recording is off. Turn it on to get suggestions.";
+
+    public string PanicTip => IsRecording
+        ? "Panic. Reads the text area right now, exactly as it looks at this moment, and gives you a reply to type. Works even with Auto-suggest off. If no area is selected yet, it asks you to pick one."
+        : "Recording is off. Turn it on to use Panic.";
+
+    public string RegenerateTip => IsRecording
+        ? "Regenerate. Redo this reply with a different take. Type a direction in the box first, like “shorter”, to steer it."
+        : "Recording is off. Turn it on to use Regenerate.";
+
     private void RaiseStatusProperties()
     {
+        OnPropertyChanged(nameof(SendTip));
+        OnPropertyChanged(nameof(PanicTip));
+        OnPropertyChanged(nameof(RegenerateTip));
         OnPropertyChanged(nameof(StatusLine));
         OnPropertyChanged(nameof(IsListening));
         OnPropertyChanged(nameof(IsThinking));
@@ -191,6 +207,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 break;
             case EngineEventKind.Error:
                 Set(StatusKind.Error, e.Text ?? "Something went wrong.");
+                break;
+            case EngineEventKind.Recovered:
+                // Whatever reported this problem works again (a device came back, the screen unlocked).
+                if (Status == StatusKind.Error && StatusText == e.Text) SetListening();
                 break;
             case EngineEventKind.RegionChanged:
                 HasRegion = e.Region is not null;

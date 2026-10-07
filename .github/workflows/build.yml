@@ -29,6 +29,7 @@ jobs:
     permissions:
       contents: write
     env:
+      AVALONIA_TELEMETRY_OPTOUT: '1'
       RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
       INPUT_TAG: ${{ inputs.tag }}
     steps:
@@ -36,6 +37,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      # The same tests again on Windows itself (the first job runs them on Linux).
+      - name: Test on Windows
+        shell: pwsh
+        run: dotnet test ClaudeLiveAssistant.sln -c Release
 
       - name: Work out the tag and version
         id: ver
@@ -58,6 +64,74 @@ jobs:
             -p:Version=${{ steps.ver.outputs.version }} -o ClaudeLiveAssistant
           Remove-Item ClaudeLiveAssistant\*.pdb -ErrorAction SilentlyContinue
           Copy-Item packaging\README.txt ClaudeLiveAssistant\README.txt
+
+      # The speech engine's native libraries need the Visual C++ runtime, which a clean Windows PC
+      # may not have. Ship it next to the exe ("app-local deployment", allowed by Microsoft).
+      - name: Bundle the Visual C++ runtime
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -property installationPath
+          $root = Join-Path $vs 'VC\Redist\MSVC'
+          $ver = Get-ChildItem $root -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+' } |
+                 Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+          if (-not $ver) { throw "No Visual C++ redistributable found under $root" }
+          Write-Host "Using $($ver.FullName)"
+          $x64 = Join-Path $ver.FullName 'x64'
+          foreach ($pattern in 'Microsoft.VC*.CRT', 'Microsoft.VC*.OpenMP') {
+            $dir = Get-ChildItem $x64 -Directory | Where-Object Name -like $pattern | Select-Object -First 1
+            if (-not $dir) { throw "Missing $pattern under $x64" }
+            Copy-Item (Join-Path $dir.FullName '*.dll') ClaudeLiveAssistant\ -Force
+          }
+          foreach ($dll in 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'vcomp140.dll') {
+            if (-not (Test-Path "ClaudeLiveAssistant\$dll")) { throw "$dll was not bundled" }
+          }
+
+      - name: Check that nothing is missing on a clean PC
+        shell: pwsh
+        run: python packaging\check-deps.py ClaudeLiveAssistant
+
+      # Real-Windows checks of the things that differ between PCs (see src/Assistant.App/SelfTest.cs):
+      # the speech engine's native libraries, real speech into text, drawing the windows, hiding them
+      # from screen capture. Runs the engine twice: normally, and as a CPU without AVX2 would.
+      - name: Record some speech with Windows' own voice
+        shell: powershell
+        continue-on-error: true
+        run: |
+          Add-Type -AssemblyName System.Speech
+          $voice = New-Object System.Speech.Synthesis.SpeechSynthesizer
+          $voice.SetOutputToWaveFile("$PWD\selftest.wav")
+          $voice.Speak('Can you start on Monday morning please')
+          $voice.Dispose()
+
+      - uses: actions/cache@v4
+        with:
+          path: selftest-models
+          key: whisper-tiny-en-v1
+
+      - name: Self-test
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($mode in 'avx2', 'noavx') {
+            $arguments = @('--self-test', '--out', "$PWD\selftest-$mode", '--models', "$PWD\selftest-models")
+            if (Test-Path selftest.wav) { $arguments += @('--wav', "$PWD\selftest.wav", '--expect', 'monday') }
+            if ($mode -eq 'noavx') { $arguments += '--noavx' }
+            $p = Start-Process ClaudeLiveAssistant\ClaudeLiveAssistant.exe -ArgumentList $arguments -Wait -PassThru
+            Write-Host "===== self-test ($mode), exit code $($p.ExitCode) ====="
+            if (Test-Path "selftest-$mode\self-test.txt") { Get-Content "selftest-$mode\self-test.txt" } else { Write-Host 'no report was written' }
+            if ($p.ExitCode -ne 0) { $failed = $true }
+          }
+          if ($failed) { throw 'The self-test failed' }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: self-test
+          path: |
+            selftest-avx2
+            selftest-noavx
+            selftest.wav
 
       - name: Zip
         shell: pwsh

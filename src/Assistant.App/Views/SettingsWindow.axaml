@@ -7,6 +7,7 @@
         Title="Settings"
         Icon="avares://ClaudeLiveAssistant/Assets/app.png"
         Width="480" Height="760" MinWidth="420" MinHeight="520"
+        ToolTip.ShowOnDisabled="True"
         WindowStartupLocation="CenterOwner"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="PreferSystemChrome"
@@ -33,19 +34,23 @@
             <StackPanel Spacing="12">
               <Grid ColumnDefinitions="*,Auto,Auto" IsVisible="{Binding !IsEditingKey}" ColumnSpacing="6">
                 <TextBlock Text="{Binding MaskedKey}" FontFamily="Consolas, 'Cascadia Mono', Menlo, monospace" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Classes="secondary" Content="Change" Command="{Binding ChangeKeyCommand}" Padding="12,6" />
-                <Button Grid.Column="2" Classes="ghost" Content="Remove" Command="{Binding RemoveKeyCommand}" IsVisible="{Binding HasKey}" />
+                <Button Grid.Column="1" Classes="secondary" Content="Change" Command="{Binding ChangeKeyCommand}" Padding="12,6"
+                        ToolTip.Tip="Replace the saved key with a different one." />
+                <Button Grid.Column="2" Classes="ghost" Content="Remove" Command="{Binding RemoveKeyCommand}" IsVisible="{Binding HasKey}"
+                        ToolTip.Tip="Remove the saved key from this PC. You will be asked for a key again." />
               </Grid>
               <StackPanel Spacing="10" IsVisible="{Binding IsEditingKey}">
                 <Grid ColumnDefinitions="*,Auto">
-                  <TextBox Classes="field" Text="{Binding KeyEntry.Key}" PasswordChar="{Binding KeyEntry.PasswordChar}" Watermark="sk-ant-…" />
+                  <TextBox Classes="field" Text="{Binding KeyEntry.Key}" PasswordChar="{Binding KeyEntry.PasswordChar}" Watermark="sk-ant-…"
+                           ToolTip.Tip="Your Claude API key, from console.anthropic.com. It is stored encrypted on this PC and only ever sent to Anthropic." />
                   <Button Grid.Column="1" Classes="icon" Command="{Binding KeyEntry.ToggleRevealCommand}" Margin="4,0,0,0" ToolTip.Tip="Show or hide the key">
                     <Path Data="{StaticResource IconEye}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round" Width="17" Height="17" Stretch="Uniform" />
                   </Button>
                 </Grid>
                 <TextBlock Text="{Binding KeyEntry.Error}" IsVisible="{Binding KeyEntry.HasError}" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" Classes="small" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Classes="primary" Content="Check and save" Command="{Binding KeyEntry.SubmitCommand}" Padding="14,8" />
+                  <Button Classes="primary" Content="Check and save" Command="{Binding KeyEntry.SubmitCommand}" Padding="14,8"
+                          ToolTip.Tip="Check the key with Anthropic, then save it, encrypted, on this PC." />
                   <Button Classes="secondary" Content="Cancel" Command="{Binding CancelChangeKeyCommand}" Padding="14,8" />
                 </StackPanel>
               </StackPanel>
@@ -56,35 +61,42 @@
         <!-- Style -->
         <StackPanel Spacing="14">
           <TextBlock Classes="eyebrow" Text="HOW REPLIES SOUND" />
-          <StackPanel Spacing="6">
+          <StackPanel Spacing="6" Background="Transparent"
+                      ToolTip.Tip="How formal the replies sound. Rest the mouse on an option to see what it means.">
             <TextBlock Text="Professionalism" FontWeight="SemiBold" />
             <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.ProfessionalismItems}" SelectedIndex="{Binding ProfessionalismIndex}" />
           </StackPanel>
-          <StackPanel Spacing="6">
+          <StackPanel Spacing="6" Background="Transparent"
+                      ToolTip.Tip="How much jargon replies use and how deeply they explain things. It isn’t about length.">
             <TextBlock Text="Proficiency" FontWeight="SemiBold" />
             <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.ProficiencyItems}" SelectedIndex="{Binding ProficiencyIndex}" />
             <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{Binding ProficiencyCaption}" />
             <TextBlock Classes="faint small" TextWrapping="Wrap" Text="How much jargon replies use and how deeply they explain things." />
           </StackPanel>
-          <StackPanel Spacing="6">
+          <StackPanel Spacing="6" Background="Transparent"
+                      ToolTip.Tip="The attitude of the replies. Rest the mouse on an option to see what it means.">
             <TextBlock Text="Tone" FontWeight="SemiBold" />
             <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.ToneItems}" SelectedIndex="{Binding ToneIndex}" />
           </StackPanel>
           <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
-            <StackPanel Spacing="6">
+            <StackPanel Spacing="6" Background="Transparent"
+                        ToolTip.Tip="How long each suggested reply is.">
               <TextBlock Text="Length" FontWeight="SemiBold" />
               <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.LengthItems}" SelectedIndex="{Binding LengthIndex}" />
             </StackPanel>
-            <StackPanel Grid.Column="1" Spacing="6">
+            <StackPanel Grid.Column="1" Spacing="6" Background="Transparent"
+                        ToolTip.Tip="How many alternatives you get for SAY and for TYPE.">
               <TextBlock Text="Options per section" FontWeight="SemiBold" />
               <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.OptionItems}" SelectedIndex="{Binding OptionsIndex}" />
             </StackPanel>
           </Grid>
-          <StackPanel Spacing="6">
+          <StackPanel Spacing="6" Background="Transparent"
+                      ToolTip.Tip="The language replies are written in. Leave it empty to reply in the language the other person is speaking, or type one, like “Spanish”.">
             <TextBlock Text="Reply language" FontWeight="SemiBold" />
             <TextBox Classes="field" Text="{Binding ReplyLanguage}" Watermark="Same as the other person" />
           </StackPanel>
-          <StackPanel Spacing="6">
+          <StackPanel Spacing="6" Background="Transparent"
+                      ToolTip.Tip="Anything Claude should know to sound like you: your role, the situation, words to avoid. It is included with every request.">
             <TextBlock Text="About me and extra instructions" FontWeight="SemiBold" />
             <TextBox Classes="field" Text="{Binding CustomInstructions}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="84"
                      Watermark="e.g. “I’m interviewing for a junior analyst role.” or “Never use the word synergy.”" />
@@ -109,7 +121,7 @@
         <!-- Privacy -->
         <StackPanel Spacing="10">
           <TextBlock Classes="eyebrow" Text="PRIVACY" />
-          <Border Classes="card">
+          <Border Classes="card" ToolTip.Tip="{Binding HideTip}">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Spacing="2">
                 <TextBlock Text="Hide from screen sharing" FontWeight="SemiBold" />
@@ -126,7 +138,8 @@
         <!-- Listening -->
         <StackPanel Spacing="10">
           <TextBlock Classes="eyebrow" Text="LISTENING" />
-          <Border Classes="card">
+          <Border Classes="card"
+                  ToolTip.Tip="Include my microphone. On: your own voice is transcribed too, as “You”, so Claude knows what you have already said. Use headphones, or the mic will also pick up the other person from your speakers.">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Spacing="2">
                 <TextBlock Text="Include my microphone" FontWeight="SemiBold" />
@@ -135,7 +148,8 @@
               <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseMicrophone}" OnContent="" OffContent="" Margin="12,0,0,0" />
             </Grid>
           </Border>
-          <TextBlock Text="Speech recognition" FontWeight="SemiBold" Margin="2,6,0,0" />
+          <TextBlock Text="Speech recognition" FontWeight="SemiBold" Margin="2,6,0,0" Background="Transparent"
+                     ToolTip.Tip="Which model turns speech into text on this PC. Bigger is more accurate but slower. A model downloads once, the first time it is used." />
           <ListBox Classes="choices" ItemsSource="{x:Static vm:SettingsViewModel.SpeechItems}" SelectedItem="{Binding SelectedSpeech}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:SpeechChoice">

@@ -30,7 +30,7 @@ public sealed class AppHost : IDisposable
 
     public AppHost()
     {
-        Settings = _store.Load();
+        Settings = _store.Exists ? _store.Load() : Settings.ForFirstRun(Environment.ProcessorCount);
         _apiKey = _keys.Load();
         Capture = PlatformServices.CreateScreenCapture();
         _suggester = new ClaudeSuggester(() => _apiKey);
@@ -64,8 +64,14 @@ public sealed class AppHost : IDisposable
             KeyRemoved?.Invoke();
             return;
         }
-        _keys.Save(key);
         _apiKey = key;
+        try { _keys.Save(key); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException)
+        {
+            // Keep going with the key for this session; just say it won't be remembered.
+            AppLog.Error("Couldn't save the API key", ex);
+            _vm?.SetProblem("Couldn't save your key on this PC, so you'll be asked for it again next time.");
+        }
     }
 
     public MainWindow CreateMainWindow()
@@ -76,6 +82,7 @@ public sealed class AppHost : IDisposable
         _window = new MainWindow { DataContext = _vm };
         _window.Opened += (_, _) =>
         {
+            WindowFit.ClampToScreen(_window);
             PlaceTopRight(_window);
             Engine.Start();
             StartListening();
@@ -95,8 +102,13 @@ public sealed class AppHost : IDisposable
         var area = w.Screens.Primary?.WorkingArea;
         if (area is not { } a) return;
         double scale = w.Screens.Primary!.Scaling;
-        w.Position = new PixelPoint(a.Right - (int)(w.Width * scale) - 24, a.Y + 32);
+        w.Position = new PixelPoint(Math.Max(a.X, a.Right - (int)(w.Width * scale) - 24), a.Y + 32);
+        WindowFit.KeepOnScreen(w);
     }
+
+    /// <summary>Called for an unexpected exception on the UI thread: say so, keep running.</summary>
+    public void ReportUnexpected(Exception ex) =>
+        _vm?.SetProblem($"Something unexpected went wrong ({ex.GetType().Name}). The app is still running; details are in the log.");
 
     // -- listening ------------------------------------------------------------------------------
 
@@ -175,7 +187,18 @@ public sealed class AppHost : IDisposable
             var path = await SpeechModel.EnsureAsync(accuracy,
                 new Progress<double>(p => Ui(() => _vm?.SetPreparing($"Downloading speech recognition… {p:P0}", p))), cts.Token);
             Ui(() => _vm?.SetPreparing("Loading speech recognition…", null));
-            var stt = new WhisperSpeechToText(path);
+            WhisperSpeechToText stt;
+            try { stt = new WhisperSpeechToText(path); }
+            catch (Whisper.net.WhisperModelLoadException ex)
+            {
+                // The file is there but won't load (damaged): fetch a fresh copy once.
+                AppLog.Error("The speech model wouldn't load; downloading it again", ex);
+                File.Delete(path);
+                path = await SpeechModel.EnsureAsync(accuracy,
+                    new Progress<double>(p => Ui(() => _vm?.SetPreparing($"Downloading speech recognition… {p:P0}", p))), cts.Token);
+                stt = new WhisperSpeechToText(path);
+            }
+            AppLog.Info($"Speech model ready ({accuracy}); native runtime: {Whisper.net.LibraryLoader.RuntimeOptions.LoadedLibrary}");
             Ui(() => _vm?.SetListening());
             return stt;
         }, cts.Token);
@@ -183,7 +206,11 @@ public sealed class AppHost : IDisposable
         _ = task.ContinueWith(t =>
         {
             if (t.IsFaulted && !cts.IsCancellationRequested)
-                Ui(() => _vm?.SetProblem($"Couldn't set up speech recognition: {t.Exception!.GetBaseException().Message}", canRetry: true));
+            {
+                var ex = t.Exception!.GetBaseException();
+                AppLog.Error("Speech recognition setup failed", ex);
+                Ui(() => _vm?.SetProblem(SpeechModel.Explain(ex, accuracy), canRetry: true));
+            }
         }, TaskScheduler.Default);
     }
 
@@ -248,7 +275,23 @@ public sealed class AppHost : IDisposable
     {
         if (_window is null) return;
         var clipboard = TopLevel.GetTopLevel(_window)?.Clipboard;
-        if (clipboard is not null) await clipboard.SetTextAsync(text);
+        if (clipboard is null) return;
+        // Another program holding the clipboard open makes this fail for a moment: try a few times.
+        for (int attempt = 1; ; attempt++)
+        {
+            try { await clipboard.SetTextAsync(text); return; }
+            catch (Exception ex) when (attempt < 4)
+            {
+                AppLog.Warn($"Clipboard busy ({ex.GetType().Name}); retrying");
+                await Task.Delay(120);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("Couldn't copy to the clipboard", ex);
+                _vm?.SetProblem("Couldn't copy: another program is using the clipboard. Try again.");
+                return;
+            }
+        }
     }
 
     public void Dispose()

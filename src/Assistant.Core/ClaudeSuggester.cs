@@ -14,6 +14,8 @@ public interface ISuggester
 /// <summary>Talks to the Claude API with the key the user entered.</summary>
 public sealed class ClaudeSuggester : ISuggester
 {
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(120);
+    private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(20);
     private const string FallbackBeta = "server-side-fallback-2026-07-01";
 
     // Models for which the server-side `fallbacks: "default"` parameter applies.
@@ -41,9 +43,10 @@ public sealed class ClaudeSuggester : ISuggester
         if (string.IsNullOrWhiteSpace(key)) throw new InvalidOperationException("No Claude API key is set.");
         if (_client is null || _clientKey != key)
         {
+            // A reply is a few hundred tokens; if nothing has come back in two minutes the connection is stuck.
             _client = _baseUrl is null
-                ? new AnthropicClient { ApiKey = key }
-                : new AnthropicClient { ApiKey = key, BaseUrl = _baseUrl };
+                ? new AnthropicClient { ApiKey = key, Timeout = RequestTimeout }
+                : new AnthropicClient { ApiKey = key, BaseUrl = _baseUrl, Timeout = RequestTimeout };
             _clientKey = key;
         }
         return _client;
@@ -96,10 +99,13 @@ public sealed class ClaudeSuggester : ISuggester
     {
         try
         {
+            // A blocked network (firewall, proxy) must not leave "Checking your key…" spinning for minutes.
             var client = baseUrl is null
-                ? new AnthropicClient { ApiKey = apiKey.Trim() }
-                : new AnthropicClient { ApiKey = apiKey.Trim(), BaseUrl = baseUrl };
-            await client.Models.List(cancellationToken: ct);
+                ? new AnthropicClient { ApiKey = apiKey.Trim(), Timeout = CheckTimeout, MaxRetries = 1 }
+                : new AnthropicClient { ApiKey = apiKey.Trim(), BaseUrl = baseUrl, Timeout = CheckTimeout, MaxRetries = 1 };
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            limit.CancelAfter(CheckTimeout + TimeSpan.FromSeconds(5));
+            await client.Models.List(cancellationToken: limit.Token);
             return (true, "");
         }
         catch (Exception ex)
@@ -115,9 +121,21 @@ public sealed class ClaudeSuggester : ISuggester
         AnthropicForbiddenException => "That key doesn't have permission to use the Claude API.",
         AnthropicRateLimitException => "Claude is rate-limiting this key right now. Try again in a moment.",
         Anthropic5xxException => "Claude's service had a problem. Try again in a moment.",
+        AnthropicNotFoundException => "Claude couldn't find that model for this key. Pick another model in Settings.",
         AnthropicApiException a => $"Claude API error: {a.Message}",
-        HttpRequestException => "Couldn't reach the Claude API. Check your internet connection.",
-        InvalidOperationException => ex.Message,
+        _ when Contains<System.Security.Authentication.AuthenticationException>(ex) =>
+            "Couldn't make a secure connection to Claude. A proxy, antivirus program or a wrong date and time on this PC can cause that.",
+        AnthropicIOException or HttpRequestException =>
+            "Couldn't reach the Claude API. Check your internet connection, and any proxy or firewall.",
+        TaskCanceledException or TimeoutException or OperationCanceledException =>
+            "Claude took too long to answer. Check your connection and try again.",
         _ => ex.Message,
     };
+
+    private static bool Contains<T>(Exception? ex) where T : Exception
+    {
+        for (; ex is not null; ex = ex.InnerException)
+            if (ex is T) return true;
+        return false;
+    }
 }

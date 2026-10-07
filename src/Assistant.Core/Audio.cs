@@ -7,6 +7,10 @@ public interface IAudioSource : IDisposable
 {
     event Action<float[]>? Utterance;
     event Action<string>? Failed;
+
+    /// <summary>The device works again after a <see cref="Failed"/> (it was unplugged, the PC slept, ...).</summary>
+    event Action? Recovered { add { } remove { } }
+
     void Start();
 }
 
@@ -96,17 +100,37 @@ public sealed class AudioPipeline : IDisposable
 {
     private readonly Engine _engine;
     private readonly Task<ISpeechToText> _stt;
-    private readonly System.Threading.Channels.Channel<(Speaker Who, float[] Audio)> _queue =
-        System.Threading.Channels.Channel.CreateBounded<(Speaker, float[])>(
-            new System.Threading.Channels.BoundedChannelOptions(8) { FullMode = System.Threading.Channels.BoundedChannelFullMode.DropOldest });
+    private readonly System.Threading.Channels.Channel<(Speaker Who, float[] Audio)> _queue;
     private readonly CancellationTokenSource _cts = new();
     private readonly List<IAudioSource> _sources = new();
+    private readonly Func<DateTime> _now;
+    private DateTime _lastBehindNotice = DateTime.MinValue;
     private Task? _loop;
 
-    public AudioPipeline(Engine engine, Task<ISpeechToText> stt)
+    /// <summary>Shown when speech arrives faster than this PC can transcribe it and the oldest is skipped.</summary>
+    public const string FallingBehind =
+        "Speech recognition can't keep up on this PC, so some speech was skipped. Choose Fast under Settings, Speech recognition.";
+
+    public AudioPipeline(Engine engine, Task<ISpeechToText> stt, Func<DateTime>? now = null)
     {
         _engine = engine;
         _stt = stt;
+        _now = now ?? (() => DateTime.UtcNow);
+        _queue = System.Threading.Channels.Channel.CreateBounded<(Speaker, float[])>(
+            new System.Threading.Channels.BoundedChannelOptions(8) { FullMode = System.Threading.Channels.BoundedChannelFullMode.DropOldest },
+            _ => NoteDropped());
+    }
+
+    private void NoteDropped()
+    {
+        // The bounded queue overflowed: transcription is slower than real time. Say so, at most once a minute.
+        var now = _now();
+        lock (_sources)
+        {
+            if (now - _lastBehindNotice < TimeSpan.FromMinutes(1)) return;
+            _lastBehindNotice = now;
+        }
+        _engine.RaiseError(FallingBehind);
     }
 
     private bool _started;
@@ -114,8 +138,10 @@ public sealed class AudioPipeline : IDisposable
     /// <summary>Attach a device. If the pipeline is already running the device starts right away.</summary>
     public void Add(Speaker who, IAudioSource source)
     {
+        string? lastFailure = null;
         source.Utterance += audio => _queue.Writer.TryWrite((who, audio));
-        source.Failed += msg => _engine.RaiseError(msg);
+        source.Failed += msg => { lastFailure = msg; _engine.RaiseError(msg); };
+        source.Recovered += () => { if (lastFailure is { } failed) _engine.RaiseRecovered(failed); lastFailure = null; };
         lock (_sources) _sources.Add(source);
         if (_started) source.Start();
     }

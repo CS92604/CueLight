@@ -15,7 +15,12 @@ public partial class OnboardingWindow : Window
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) BeginMoveDrag(e);
         };
-        Opened += (_, _) => KeyBox.Focus();
+        Opened += (_, _) =>
+        {
+            Platform.WindowFit.ClampToScreen(this);
+            Platform.WindowFit.KeepOnScreen(this);
+            KeyBox.Focus();
+        };
         KeyBox.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter && DataContext is ViewModels.KeyEntryViewModel vm && vm.SubmitCommand.CanExecute(null))

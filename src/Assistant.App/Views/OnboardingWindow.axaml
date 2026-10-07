@@ -12,7 +12,9 @@
         ExtendClientAreaTitleBarHeightHint="-1">
   <Grid RowDefinitions="54,*">
     <Grid x:Name="Header" Background="Transparent" />
-    <StackPanel Grid.Row="1" Margin="52,8,52,40" Spacing="0" VerticalAlignment="Center">
+    <!-- Scrolls when the screen is too short for it (a 768-pixel laptop at 150% scaling). -->
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="52,8,52,40" Spacing="0" VerticalAlignment="Center">
 
       <Border Width="64" Height="64" CornerRadius="20" Background="{DynamicResource AccentSoft}" HorizontalAlignment="Left">
         <Path Data="{StaticResource IconBurst}" Stroke="{DynamicResource Accent}" StrokeThickness="2.4" StrokeLineCap="Round" Width="30" Height="30" Stretch="Uniform" />
@@ -25,20 +27,23 @@
       <TextBlock Text="Claude API key" FontWeight="SemiBold" Margin="0,38,0,8" />
       <Grid ColumnDefinitions="*,Auto">
         <TextBox x:Name="KeyBox" Classes="field" Text="{Binding Key}" PasswordChar="{Binding PasswordChar}" Watermark="sk-ant-…" FontSize="14" />
-        <Button Grid.Column="1" Classes="icon" Command="{Binding ToggleRevealCommand}" Margin="6,0,0,0" ToolTip.Tip="Show or hide the key">
+        <Button Grid.Column="1" Classes="icon" Command="{Binding ToggleRevealCommand}" Margin="6,0,0,0" ToolTip.Tip="Show or hide the key" AutomationProperties.Name="Show or hide the key">
           <Path Data="{StaticResource IconEye}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round" Width="18" Height="18" Stretch="Uniform" />
         </Button>
       </Grid>
       <TextBlock Text="{Binding Error}" IsVisible="{Binding HasError}" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" Margin="2,10,0,0" />
 
-      <Button Classes="primary" Command="{Binding SubmitCommand}" HorizontalAlignment="Stretch" Margin="0,22,0,0" FontSize="14">
+      <Button Classes="primary" Command="{Binding SubmitCommand}" HorizontalAlignment="Stretch" Margin="0,22,0,0" FontSize="14"
+              ToolTip.Tip="Check the key with Anthropic and start.">
         <TextBlock Text="{Binding IsBusy, Converter={x:Static vm:Converters.ContinueLabel}}" Foreground="White" />
       </Button>
 
-      <Button Classes="ghost" Content="Get a key at console.anthropic.com" Click="OnGetKey" HorizontalAlignment="Left" Margin="-10,10,0,0" />
+      <Button Classes="ghost" Content="Get a key at console.anthropic.com" Click="OnGetKey" HorizontalAlignment="Left" Margin="-10,10,0,0"
+              ToolTip.Tip="Opens console.anthropic.com in your browser, where you can create a key." />
 
       <TextBlock Classes="faint small" TextWrapping="Wrap" LineHeight="18" Margin="0,26,0,0"
                  Text="Your key is stored encrypted on this PC and is only ever sent to Anthropic. Speech is turned into text on your PC; only text, and the text area you choose, is sent to Claude." />
     </StackPanel>
+    </ScrollViewer>
   </Grid>
 </Window>

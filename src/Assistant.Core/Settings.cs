@@ -35,6 +35,13 @@ public sealed class Settings
     public bool HideFromCapture { get; set; }
     public SpeechAccuracy SpeechAccuracy { get; set; } = SpeechAccuracy.Balanced;
 
+    /// <summary>
+    /// Settings for a first launch. A PC with few processor cores gets the fastest speech model, so
+    /// transcription keeps up with the conversation; everything else is the normal default.
+    /// </summary>
+    public static Settings ForFirstRun(int logicalProcessors) =>
+        new() { SpeechAccuracy = logicalProcessors <= 4 ? SpeechAccuracy.Fast : SpeechAccuracy.Balanced };
+
     public Settings Clone() => (Settings)MemberwiseClone();
 
     public Settings Normalized()
@@ -112,7 +119,7 @@ public sealed class Settings
 }
 
 /// <summary>The Claude models the app offers.</summary>
-public sealed record ModelChoice(string Id, string Name, string Blurb);
+public sealed record ModelChoice(string Id, string Name, string Blurb, string Tip = "");
 
 public static class Models
 {
@@ -120,9 +127,12 @@ public static class Models
 
     public static readonly IReadOnlyList<ModelChoice> All = new[]
     {
-        new ModelChoice("claude-opus-5-5", "Claude Opus 5.5", "Best replies"),
-        new ModelChoice("claude-sonnet-5-5", "Claude Sonnet 5.5", "Faster, lower cost"),
-        new ModelChoice("claude-haiku-4-5", "Claude Haiku 4.5", "Fastest, lowest cost"),
+        new ModelChoice("claude-opus-5-5", "Claude Opus 5.5", "Best replies",
+            "The most capable model: the best replies. A little slower and costs more for each suggestion."),
+        new ModelChoice("claude-sonnet-5-5", "Claude Sonnet 5.5", "Faster, lower cost",
+            "A good balance: noticeably faster than Opus and cheaper, with very good replies."),
+        new ModelChoice("claude-haiku-4-5", "Claude Haiku 4.5", "Fastest, lowest cost",
+            "The fastest and cheapest. Good for quick, simple replies; less nuanced than the others."),
     };
 }
 
@@ -140,6 +150,9 @@ public sealed class SettingsStore
     public SettingsStore(string? directory = null) =>
         _path = Path.Combine(directory ?? AppPaths.ConfigDirectory, "settings.json");
 
+    /// <summary>False on the very first launch (nothing has been saved yet).</summary>
+    public bool Exists => File.Exists(_path);
+
     public Settings Load()
     {
         try
@@ -152,10 +165,23 @@ public sealed class SettingsStore
         }
     }
 
-    public void Save(Settings settings)
+    /// <summary>Writes settings.json (to a temporary file first, so a power cut can't leave half a file).
+    /// Returns false, and logs, if the folder can't be written; settings still apply for this session.</summary>
+    public bool Save(Settings settings)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        File.WriteAllText(_path, JsonSerializer.Serialize(settings.Normalized(), Json));
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+            var temp = _path + ".tmp";
+            File.WriteAllText(temp, JsonSerializer.Serialize(settings.Normalized(), Json));
+            File.Move(temp, _path, overwrite: true);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Error("Couldn't save settings", ex);
+            return false;
+        }
     }
 }
 

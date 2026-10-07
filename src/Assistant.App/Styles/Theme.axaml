@@ -385,6 +385,7 @@
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
     <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="ToolTip.Tip" Value="{ReflectionBinding Tip}" />
   </Style>
   <Style Selector="ListBox.segmented > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
@@ -411,6 +412,7 @@
     <Setter Property="Margin" Value="0,0,0,6" />
     <Setter Property="CornerRadius" Value="12" />
     <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="ToolTip.Tip" Value="{ReflectionBinding Tip}" />
   </Style>
   <Style Selector="ListBox.choices > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource Surface}" />
@@ -423,6 +425,21 @@
   <Style Selector="ListBox.choices > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+
+  <!-- Hover explanations: a warm card with wrapped text, in both light and dark. -->
+  <Style Selector="ToolTip">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="12,9" />
+    <Setter Property="MaxWidth" Value="300" />
+    <Setter Property="ContentTemplate">
+      <DataTemplate x:DataType="x:String">
+        <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12.5" LineHeight="18" Foreground="{DynamicResource Text}" />
+      </DataTemplate>
+    </Setter>
   </Style>
 
   <!-- Status dot -->

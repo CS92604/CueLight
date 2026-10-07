@@ -4,7 +4,13 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Assistant.App.ViewModels;
 
-public sealed record SpeechChoice(SpeechAccuracy Value, string Name, string Blurb);
+public sealed record SpeechChoice(SpeechAccuracy Value, string Name, string Blurb, string Tip = "");
+
+/// <summary>One option of a segmented control, with the explanation shown when the mouse rests on it.</summary>
+public sealed record ChoiceItem(string Label, string Tip)
+{
+    public override string ToString() => Label;
+}
 
 public sealed partial class SettingsViewModel : ObservableObject
 {
@@ -28,17 +34,49 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private readonly Action<string?> _keyChanged;
 
-    public static IReadOnlyList<string> ProfessionalismItems { get; } = new[] { "Very casual", "Casual", "Professional", "Formal" };
-    public static IReadOnlyList<string> ProficiencyItems { get; } = new[] { "Simple", "Everyday", "Fluent", "Advanced" };
-    public static IReadOnlyList<string> ToneItems { get; } = new[] { "Warm", "Neutral", "Direct", "Diplomatic", "Confident" };
-    public static IReadOnlyList<string> LengthItems { get; } = new[] { "Brief", "Short", "Detailed" };
-    public static IReadOnlyList<string> OptionItems { get; } = new[] { "1", "2", "3" };
+    public static IReadOnlyList<ChoiceItem> ProfessionalismItems { get; } = new ChoiceItem[]
+    {
+        new("Very casual", "Like texting a friend: contractions, relaxed phrasing, light slang is fine."),
+        new("Casual", "Friendly, like talking to a colleague you get along with."),
+        new("Professional", "Polite and clear, no slang, but still natural rather than stiff."),
+        new("Formal", "Courteous and precise, for a senior person or a formal setting."),
+    };
+
+    public static IReadOnlyList<ChoiceItem> ProficiencyItems { get; } =
+        Enum.GetValues<Proficiency>().Select(p => new ChoiceItem(p.ToString(), Settings.Caption(p))).ToArray();
+
+    public static IReadOnlyList<ChoiceItem> ToneItems { get; } = new ChoiceItem[]
+    {
+        new("Warm", "Personable and friendly."),
+        new("Neutral", "Matter-of-fact, with no extra warmth."),
+        new("Direct", "To the point, without padding."),
+        new("Diplomatic", "Tactful: softens anything that could land badly."),
+        new("Confident", "Assertive without being aggressive."),
+    };
+
+    public static IReadOnlyList<ChoiceItem> LengthItems { get; } = new ChoiceItem[]
+    {
+        new("Brief", "One short sentence per option."),
+        new("Short", "One or two sentences per option."),
+        new("Detailed", "Two to four sentences, with a reason or an example where it helps."),
+    };
+
+    public static IReadOnlyList<ChoiceItem> OptionItems { get; } = new ChoiceItem[]
+    {
+        new("1", "One suggestion for each of SAY and TYPE."),
+        new("2", "Two suggestions to choose from."),
+        new("3", "Three suggestions to choose from."),
+    };
+
     public static IReadOnlyList<ModelChoice> ModelItems => Models.All;
     public static IReadOnlyList<SpeechChoice> SpeechItems { get; } = new[]
     {
-        new SpeechChoice(SpeechAccuracy.Fast, "Fast", "75 MB download, lowest accuracy"),
-        new SpeechChoice(SpeechAccuracy.Balanced, "Balanced", "140 MB download, good for most calls"),
-        new SpeechChoice(SpeechAccuracy.Accurate, "Accurate", "470 MB download, best accuracy, slower"),
+        new SpeechChoice(SpeechAccuracy.Fast, "Fast", "75 MB download, lowest accuracy",
+            "The smallest speech model. Keeps up on slower PCs, but makes more mistakes."),
+        new SpeechChoice(SpeechAccuracy.Balanced, "Balanced", "140 MB download, good for most calls",
+            "Good accuracy for most calls on a typical PC."),
+        new SpeechChoice(SpeechAccuracy.Accurate, "Accurate", "470 MB download, best accuracy, slower",
+            "The most accurate. Needs a fast PC, and may fall behind live speech on a slow one."),
     };
 
     public KeyEntryViewModel KeyEntry { get; }
@@ -71,6 +109,10 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     /// <summary>Whether this PC can keep windows out of screen capture (Windows 10 version 2004+).</summary>
     public bool HideSupported => Platform.CaptureShield.IsSupported;
+    public string HideTip => HideSupported
+        ? "Hide from screen sharing. On: this app's windows are left out of screen shares, recordings and screenshots, in Teams, Zoom, Meet, OBS and the Snipping Tool. A camera pointed at your screen can still see them."
+        : "Hide from screen sharing isn't available on this PC. It needs Windows 10 version 2004 or later.";
+
     public bool HideFromCapture
     {
         get => _s.HideFromCapture && HideSupported;

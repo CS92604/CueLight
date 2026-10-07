@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace Assistant.Core;
 
-public enum EngineEventKind { Turn, SuggestStart, Chunk, SuggestEnd, Status, Error, RegionChanged, ModeChanged }
+public enum EngineEventKind { Turn, SuggestStart, Chunk, SuggestEnd, Status, Error, RegionChanged, ModeChanged, Recovered }
 
 public sealed record EngineEvent(
     EngineEventKind Kind, string? Text = null, Speaker? Speaker = null, Region? Region = null);
@@ -70,7 +70,13 @@ public sealed class Engine : IDisposable
         Options = options;
         _suggester = suggester;
         _capture = capture;
-        _watcherFactory = watcherFactory ?? ((r, onChange, onError) => new ScreenWatcher(r, capture, onChange, onError));
+        _watcherFactory = watcherFactory ?? ((r, onChange, onError) =>
+        {
+            string? failure = null;
+            return new ScreenWatcher(r, capture, onChange,
+                msg => { failure = msg; onError(msg); },
+                onRecovered: () => { if (failure is { } f) RaiseRecovered(f); failure = null; });
+        });
         Settings = new Settings();
     }
 
@@ -161,6 +167,9 @@ public sealed class Engine : IDisposable
 
     /// <summary>Surface a problem from a background component (audio device, speech model, ...).</summary>
     public void RaiseError(string message) => Emit(new EngineEvent(EngineEventKind.Error, message));
+
+    /// <summary>The thing that reported <paramref name="failedMessage"/> works again; the UI clears that message.</summary>
+    public void RaiseRecovered(string failedMessage) => Emit(new EngineEvent(EngineEventKind.Recovered, failedMessage));
 
     public void OnScreenChanged()
     {
@@ -313,7 +322,17 @@ public sealed class Engine : IDisposable
                 }
             }
 
-            if (run) await RunAsync(kinds, hint, redo, rejected, runToken, epoch);
+            if (run)
+            {
+                try { await RunAsync(kinds, hint, redo, rejected, runToken, epoch); }
+                catch (Exception ex) when (!ct.IsCancellationRequested)
+                {
+                    // Whatever went wrong, the engine must keep serving later requests.
+                    AppLog.Error("Suggestion run failed", ex);
+                    Emit(new EngineEvent(EngineEventKind.Error, ClaudeSuggester.Describe(ex)));
+                    Emit(new EngineEvent(EngineEventKind.SuggestEnd));
+                }
+            }
             else
             {
                 try { await _signal.WaitAsync(wait, ct); }

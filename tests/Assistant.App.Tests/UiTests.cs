@@ -7,7 +7,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Controls.Primitives;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using Avalonia.Threading;
 
 [assembly: AvaloniaTestApplication(typeof(Assistant.App.Tests.TestAppBuilder))]
@@ -589,5 +591,126 @@ public class UiTests
         Assert.Null(await pick);
         RegionPicker.WindowsShown = null;
         owner.Close();
+    }
+
+    // -- hover explanations ----------------------------------------------------------------
+
+    /// <summary>What the mouse would show: the nearest tip on the control or one of its parents.</summary>
+    static string? TipFor(Control c)
+    {
+        for (Visual? v = c; v is not null; v = v.GetVisualParent())
+            if (v is Control k && ToolTip.GetTip(k) is string t && t.Length > 0) return t;
+        return null;
+    }
+
+    [AvaloniaFact]
+    public void Every_button_and_switch_in_the_main_window_explains_itself_on_hover()
+    {
+        using var rig = Rig.Make();
+        rig.Engine.AddTurn(Speaker.Them, "Can you start on Monday morning please?");
+        Pump(() => rig.Vm.HasSections && rig.Vm.Status == StatusKind.Listening);
+        rig.Vm.SetProblem("Couldn't set up speech recognition", canRetry: true); // makes Retry visible
+        Settle();
+        var controls = rig.Window.GetVisualDescendants().OfType<Control>()
+            .Where(c => c is ToggleButton or ToggleSwitch or Button && c is not Avalonia.Controls.Primitives.ScrollBar and not RepeatButton)
+            .Where(c => c.GetVisualAncestors().OfType<TextBox>().Any() == false)   // the text box's own inner parts
+            .ToList();
+        Assert.True(controls.Count >= 9, $"expected the buttons to be found, got {controls.Count}");
+        foreach (var c in controls)
+            Assert.False(string.IsNullOrWhiteSpace(TipFor(c)), $"{c.GetType().Name} {(c as ContentControl)?.Content} has no hover text");
+    }
+
+    [AvaloniaFact]
+    public void Hover_text_explains_what_on_and_off_mean()
+    {
+        using var rig = Rig.Make();
+        Settle();
+        var toggles = rig.Window.GetVisualDescendants().OfType<ToggleButton>().Where(t => t.Classes.Contains("pill")).ToList();
+        Assert.Equal(2, toggles.Count);
+        var recording = TipFor(toggles[0])!;
+        Assert.Contains("On:", recording); Assert.Contains("Off:", recording);
+        Assert.Contains("nothing is heard, watched or sent", recording);
+        var type = TipFor(toggles[1])!;
+        Assert.Contains("On:", type); Assert.Contains("Off:", type);
+        var auto = rig.Window.GetVisualDescendants().OfType<ToggleSwitch>().Single();
+        Assert.Contains("Off: it only answers when you press", TipFor(auto)!);
+    }
+
+    [AvaloniaFact]
+    public void Buttons_that_recording_turns_off_say_why_on_hover()
+    {
+        using var rig = Rig.Make();
+        rig.Engine.AddTurn(Speaker.Them, "Can you start on Monday morning please?");
+        Pump(() => rig.Vm.HasSections && rig.Vm.Status == StatusKind.Listening);
+        Assert.DoesNotContain("Recording is off", rig.Vm.PanicTip + rig.Vm.SendTip + rig.Vm.RegenerateTip);
+        rig.Vm.IsRecording = false;
+        Settle();
+        Assert.Contains("Recording is off", rig.Vm.PanicTip);
+        Assert.Contains("Recording is off", rig.Vm.SendTip);
+        Assert.Contains("Recording is off", rig.Vm.RegenerateTip);
+        // disabled controls still show their tip (that's where the reason is)
+        var panic = rig.Window.GetVisualDescendants().OfType<Button>().First(b => b.Classes.Contains("panic"));
+        Assert.False(panic.IsEffectivelyEnabled);
+        Assert.Contains("Recording is off", ToolTip.GetTip(panic) as string);
+        Assert.True(ToolTip.GetShowOnDisabled(rig.Window));
+    }
+
+    [AvaloniaFact]
+    public void Every_option_in_settings_explains_itself_on_hover()
+    {
+        var vm = new SettingsViewModel(new Settings(), () => { }, new KeyEntryViewModel(), "sk-ant-api03-abcdef1234", _ => { });
+        var win = new SettingsWindow { DataContext = vm, Width = 480, Height = 760 };
+        win.Show();
+        Settle();
+        // Lists only create the rows that are on screen, so look at the top of the page and then the bottom.
+        var items = win.GetVisualDescendants().OfType<ListBoxItem>().ToList();
+        win.FindControl<ScrollViewer>("Scroller")!.ScrollToEnd();
+        Settle();
+        items.AddRange(win.GetVisualDescendants().OfType<ListBoxItem>().Where(i => !items.Contains(i)));
+        Assert.True(items.Count >= 4 + 4 + 5 + 3 + 3 + 3 + 3, $"found {items.Count} options"); // professionalism, proficiency, tone, length, options, models, speech
+        foreach (var item in items)
+            Assert.False(string.IsNullOrWhiteSpace(TipFor(item)), $"option '{item.DataContext}' has no hover text");
+        foreach (var sw in win.GetVisualDescendants().OfType<ToggleSwitch>())
+            Assert.False(string.IsNullOrWhiteSpace(TipFor(sw)), "a switch has no hover text");
+        foreach (var box in win.GetVisualDescendants().OfType<TextBox>().Where(t => t.IsEffectivelyVisible))
+            Assert.False(string.IsNullOrWhiteSpace(TipFor(box)), "a text field has no hover text");
+        // each segment explains itself specifically, not just its group
+        var formal = items.First(i => i.DataContext is ChoiceItem { Label: "Formal" });
+        Assert.Contains("senior", ToolTip.GetTip(formal) as string);
+        var accurate = items.First(i => i.DataContext is SpeechChoice { Value: SpeechAccuracy.Accurate });
+        Assert.Contains("fast PC", ToolTip.GetTip(accurate) as string);
+        win.Close();
+    }
+
+    [AvaloniaFact]
+    public void The_hide_option_says_when_it_is_unavailable()
+    {
+        using (new CaptureSupportStub(false))
+            Assert.Contains("isn't available", new SettingsViewModel(new Settings(), () => { }, new KeyEntryViewModel(), null, _ => { }).HideTip);
+        using (new CaptureSupportStub(true))
+            Assert.Contains("screen shares", new SettingsViewModel(new Settings(), () => { }, new KeyEntryViewModel(), null, _ => { }).HideTip);
+    }
+
+    [AvaloniaFact]
+    public void Tooltip_card_screenshot()
+    {
+        // A ToolTip normally lives in a popup; drawn in place it shows how the card is styled and wraps.
+        var tip = new ToolTip
+        {
+            IsVisible = true,
+            Opacity = 1, // the real one fades in
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+            Content = "Recording. On: listens to your speakers (and your microphone, if you turned that on in Settings) and, when Type is on, watches the text area. Off: nothing is heard, watched or sent to Claude.",
+        };
+        var win = new Window { Width = 420, Height = 200, Content = new Border { Padding = new Thickness(40), Child = tip } };
+        foreach (var (variant, name) in new[] { (ThemeVariant.Light, "tooltip-light"), (ThemeVariant.Dark, "tooltip-dark") })
+        {
+            Theme(variant);
+            win.Show();
+            Settle();
+            Shot(win, name);
+        }
+        Theme(ThemeVariant.Default);
+        win.Close();
     }
 }
