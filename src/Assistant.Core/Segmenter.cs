@@ -25,7 +25,7 @@ public sealed class Segmenter
 
     /// <summary>The audio of the speech in progress (everything since it began, at most the latest
     /// <paramref name="maxSeconds"/>), for a live preview. Null when nobody is speaking.</summary>
-    public float[]? SnapshotSpeech(double maxSeconds = 12)
+    public float[]? SnapshotSpeech(double maxSeconds = 25)
     {
         if (!IsSpeaking) return null;
         int keep = Math.Max(1, (int)(maxSeconds * 1000 / _frameMs));
