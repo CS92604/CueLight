@@ -8,6 +8,7 @@ using Assistant.Core;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using NAudio.Wave;
@@ -225,6 +226,35 @@ internal static class SelfTest
             }
             else Line("note  hiding from capture is not available on this Windows version");
 
+            // The Copy buttons: put text on the clipboard and read it back.
+            await Check("clipboard", async () =>
+            {
+                var clipboard = TopLevel.GetTopLevel(main)?.Clipboard ?? throw new InvalidOperationException("the window has no clipboard");
+                await clipboard.SetTextAsync("claude-live-self-test");
+                using var data = await clipboard.TryGetDataAsync();
+                var back = data is null ? null : await data.TryGetTextAsync();
+                if (back != "claude-live-self-test") throw new InvalidOperationException($"the clipboard held \"{back}\" instead");
+                Line("ok    copied text to the clipboard and read it back");
+            });
+
+            // "Select area": the screen is photographed, shown dimmed in a full-screen window per monitor, and
+            // Escape closes it again. This exercises screen capture end to end.
+            await Check("area picker", async () =>
+            {
+                RegionPicker.WindowsShown = windows =>
+                {
+                    Line($"ok    area picker opened {windows.Count} full-screen window(s)");
+                    windows[0].RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Escape });
+                };
+                try
+                {
+                    var picked = await RegionPicker.PickAsync(main, new GdiScreenCapture());
+                    if (picked is not null) throw new InvalidOperationException("Escape should have cancelled the picker");
+                    Line("ok    area picker photographed the screen and closed on Escape");
+                }
+                finally { RegionPicker.WindowsShown = null; }
+            });
+
             // Settings.
             var entry = new KeyEntryViewModel();
             var win = new SettingsWindow { DataContext = new SettingsViewModel(settings, () => { }, entry, "sk-ant-api03-abcdef1234", _ => { }) };
@@ -237,6 +267,13 @@ internal static class SelfTest
         }
         catch (Exception ex) { Fail("windows", ex); }
         desktop.Shutdown(_failures == 0 ? 0 : 1);
+    }
+
+    /// <summary>Runs one check inside the window run, recording a failure without stopping the rest.</summary>
+    private static async Task Check(string name, Func<Task> body)
+    {
+        try { await body(); }
+        catch (Exception ex) { Fail(name, ex); }
     }
 
     private static IntPtr TryPlatformHandle(this Window w) => w.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
