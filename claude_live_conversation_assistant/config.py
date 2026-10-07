@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from .regions import Region
+
 
 @dataclass
 class Config:
@@ -29,5 +31,7 @@ class Config:
     auto_suggest: bool = True  # suggest after each thing "Them" says
     auto_min_words: int = 4  # ignore "mm-hmm", "okay" for auto mode
     debounce_s: float = 1.0  # wait this long after the last utterance before asking Claude
-    include_screen: bool = False  # attach a screenshot to each request
+    region: Region | None = None  # watched screen area for written text
+    watch_interval_s: float = 0.5  # how often the watched area is sampled
+    merge_hold_s: float = 3.0  # max time to hold a spoken request while the watched text is still changing
     transcript_chars: int = 8000  # rolling window sent to Claude

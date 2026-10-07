@@ -6,12 +6,14 @@ import queue
 import sys
 import threading
 
+from . import settings as settings_mod
 from .config import Config
 from .engine import Engine
-from .suggest import Suggester
+from .regions import Region
+from .suggest import SPEECH, Suggester
 
 
-def parse_args(argv: list[str] | None = None) -> tuple[Config, argparse.Namespace]:
+def parse_args(argv: list[str] | None = None) -> tuple[Config, settings_mod.Settings, argparse.Namespace]:
     p = argparse.ArgumentParser(
         prog="claude_live_conversation_assistant",
         description="Listen to your PC's audio, transcribe it locally, and get Claude-suggested replies.",
@@ -27,10 +29,14 @@ def parse_args(argv: list[str] | None = None) -> tuple[Config, argparse.Namespac
     p.add_argument("--mic", action="store_true", help="Also transcribe your own microphone as 'Me' (use headphones to avoid echo)")
     p.add_argument("--mic-device", help="Substring of the microphone to use with --mic")
     p.add_argument("--manual", action="store_true", help="Only suggest when you press the button; no automatic suggestions")
-    p.add_argument("--screen", action="store_true", help="Attach a screenshot of your primary monitor to each request")
+    p.add_argument("--region", help="Watch this screen area for written text: left,top,width,height in pixels (in the window you can drag one with 'Select text area')")
     p.add_argument("--no-fallbacks", action="store_true", help="Don't send the server-side refusal-fallback parameter")
     p.add_argument("--console", action="store_true", help="Print to the terminal instead of opening the overlay window")
-    p.add_argument("--text", action="store_true", help="No audio: type what the other person said (prefix 'me:' for yourself). Implies --console")
+    p.add_argument("--simulate", action="store_true", help="No audio: type what the other person said (prefix 'me:' for yourself). Implies --console")
+    for key, table in settings_mod.CHOICES.items():
+        p.add_argument(f"--{key}", choices=list(table), help=f"Override the saved {key} setting for this run")
+    p.add_argument("--options", type=int, choices=[1, 2, 3], help="Suggestions per section")
+    p.add_argument("--reply-language", help="Language to write replies in (default: match the other person)")
     p.add_argument("--list-devices", action="store_true", help="List audio devices and exit")
     args = p.parse_args(argv)
 
@@ -49,9 +55,14 @@ def parse_args(argv: list[str] | None = None) -> tuple[Config, argparse.Namespac
         mic_device=args.mic_device,
         use_mic=args.mic,
         auto_suggest=not args.manual,
-        include_screen=args.screen,
+        region=Region.parse(args.region) if args.region else None,
     )
-    return cfg, args
+    settings = settings_mod.load()
+    for key in (*settings_mod.CHOICES, "options", "reply_language"):
+        value = getattr(args, key, None)
+        if value is not None:
+            setattr(settings, key, value)
+    return cfg, settings.normalized(), args
 
 
 def console_sink(done: threading.Event):
@@ -99,7 +110,7 @@ def run_text_mode(engine: Engine, done: threading.Event) -> None:
             else:
                 engine.conversation.add("them", line)
                 engine.emit("turn", ("them", line))
-                engine.request()
+                engine.request(kinds={SPEECH})
             done.wait(timeout=120)
     except KeyboardInterrupt:
         pass
@@ -149,7 +160,7 @@ def run_audio(cfg: Config, engine: Engine, emit) -> tuple[threading.Event, list]
 
 
 def main(argv: list[str] | None = None) -> int:
-    cfg, args = parse_args(argv)
+    cfg, settings, args = parse_args(argv)
 
     if args.list_devices:
         from . import audio
@@ -160,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     if not os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("ANTHROPIC_AUTH_TOKEN"):
         print("Note: ANTHROPIC_API_KEY is not set; relying on an `ant auth login` profile if you have one.", file=sys.stderr)
 
-    use_window = not (args.console or args.text)
+    use_window = not (args.console or args.simulate)
     overlay = None
     if use_window:
         try:
@@ -173,15 +184,15 @@ def main(argv: list[str] | None = None) -> int:
     events: queue.Queue = queue.Queue()
     emit = (lambda kind, payload: events.put((kind, payload))) if use_window else console_sink(done)
 
-    engine = Engine(cfg, Suggester(cfg), emit)
+    engine = Engine(cfg, Suggester(cfg), emit, settings)
     engine.start()
 
     stop = None
-    if not args.text:
+    if not args.simulate:
         try:
             stop, _ = run_audio(cfg, engine, emit)
         except Exception as exc:
-            print(f"Couldn't start audio capture: {exc}\nTry --list-devices, or --text to type the conversation.", file=sys.stderr)
+            print(f"Couldn't start audio capture: {exc}\nTry --list-devices, or --simulate to type the conversation.", file=sys.stderr)
             engine.stop()
             return 1
 
@@ -189,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
         if use_window:
             overlay = Overlay(engine, cfg, events)
             overlay.run()
-        elif args.text:
+        elif args.simulate:
             run_text_mode(engine, done)
         else:
             print("Listening… press Ctrl+C to stop.")
