@@ -5,7 +5,7 @@
         x:DataType="vm:MainViewModel"
         Title="Claude Live Assistant"
         Icon="avares://ClaudeLiveAssistant/Assets/app.png"
-        Width="440" Height="780" MinWidth="380" MinHeight="560"
+        Width="440" Height="780" MinWidth="420" MinHeight="560"
         Topmost="{Binding PinOnTop}"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="PreferSystemChrome"
@@ -16,10 +16,11 @@
 
     <!-- Header -->
     <Grid x:Name="Header" DockPanel.Dock="Top" Height="54" Margin="22,0,0,0" ColumnDefinitions="*,Auto,Auto,150" Background="Transparent">
-      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" IsHitTestVisible="False">
+      <!-- The title gives way (with "…") rather than run under the buttons when the window is very narrow. -->
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center" IsHitTestVisible="False">
         <Path Data="{StaticResource IconBurst}" Stroke="{DynamicResource Accent}" StrokeThickness="2.6" StrokeLineCap="Round" Width="20" Height="20" Stretch="Uniform" />
-        <TextBlock Classes="title" Text="Live Assistant" VerticalAlignment="Center" />
-      </StackPanel>
+        <TextBlock Grid.Column="1" Classes="title" Text="Live Assistant" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      </Grid>
       <ToggleButton Grid.Column="1" Classes="icon" IsChecked="{Binding PinOnTop}" VerticalAlignment="Center"
                     AutomationProperties.Name="Keep on top"
                     ToolTip.Tip="Keep on top. When on, this window stays above your other windows, so you can glance at it during a call.">
@@ -68,7 +69,7 @@
             </Button>
           </Grid>
         </Border>
-        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
           <ToggleSwitch IsChecked="{Binding AutoSuggest}" OnContent="Auto-suggest" OffContent="Auto-suggest" FontSize="12"
                         ToolTip.Tip="Auto-suggest. On: Claude suggests a reply by itself whenever someone speaks or the text area changes. Off: it only answers when you press Send or Panic." />
           <Button Grid.Column="2" Classes="panic" Command="{Binding PanicCommand}" VerticalAlignment="Center"
@@ -79,7 +80,7 @@
               <TextBlock Text="Panic" Foreground="{Binding $parent[Button].Foreground}" />
             </StackPanel>
           </Button>
-          <Button Grid.Column="3" Classes="ghost" Content="Clear chat" Command="{Binding ClearChatCommand}"
+          <Button Grid.Column="3" Classes="ghost" Content="Clear chat" Command="{Binding ClearChatCommand}" Margin="4,0,-6,0" VerticalAlignment="Center"
                   ToolTip.Tip="Clear chat. Forgets the conversation so far, including what Claude has been shown, and clears the suggestions. Use it when a new call starts." />
         </Grid>
       </StackPanel>
@@ -90,10 +91,10 @@
 
         <!-- Status -->
         <StackPanel Spacing="8" Margin="4,0,4,0">
-          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9">
-            <Ellipse Classes="dot" Classes.listening="{Binding IsListening}" Classes.busy="{Binding IsThinking}" Classes.error="{Binding IsError}" VerticalAlignment="Top" Margin="0,5,0,0" />
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <Ellipse Classes="dot" Classes.listening="{Binding IsListening}" Classes.busy="{Binding IsThinking}" Classes.error="{Binding IsError}" VerticalAlignment="Top" Margin="0,5,9,0" />
             <TextBlock Grid.Column="1" Text="{Binding StatusLine}" Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" LineHeight="18" />
-            <Button Grid.Column="2" Classes="ghost" Content="Retry" Command="{Binding RetrySpeechCommand}" IsVisible="{Binding RetryVisible}" Padding="10,3"
+            <Button Grid.Column="2" Classes="ghost" Content="Retry" Command="{Binding RetrySpeechCommand}" IsVisible="{Binding RetryVisible}" Padding="10,3" Margin="9,0,-10,0" VerticalAlignment="Center"
                     ToolTip.Tip="Try setting up speech recognition again." />
           </Grid>
           <ProgressBar Classes="thin" Value="{Binding Progress}" Minimum="0" Maximum="100" IsVisible="{Binding ProgressVisible}" />
@@ -122,7 +123,7 @@
 
         <!-- Text area -->
         <Border Classes="card" Padding="14,12" IsVisible="{Binding TypeEnabled}">
-          <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
             <Border Width="36" Height="36" CornerRadius="10" Background="{DynamicResource SurfaceAlt}" VerticalAlignment="Center">
               <Path Data="{StaticResource IconScan}" Stroke="{DynamicResource TextMuted}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round" Width="18" Height="18" Stretch="Uniform" />
             </Border>
@@ -130,13 +131,15 @@
               <TextBlock Text="Text area to watch" FontWeight="SemiBold" />
               <TextBlock Text="{Binding RegionText}" Classes="muted small" TextWrapping="Wrap" />
             </StackPanel>
-            <Button Grid.Column="2" Classes="secondary" Content="{Binding HasRegion, Converter={x:Static vm:Converters.SelectLabel}}" Command="{Binding SelectRegionCommand}" VerticalAlignment="Center"
-                    ToolTip.Tip="Drag a box over the exact part of the screen to watch: a chat, an email or a document. Claude only ever sees what is inside the box." />
-            <Button Grid.Column="3" Classes="icon" Command="{Binding ClearRegionCommand}" IsVisible="{Binding HasRegion}" VerticalAlignment="Center"
-                    AutomationProperties.Name="Stop watching this area"
-                    ToolTip.Tip="Stop watching this area. Type stays on; pick a new area whenever you like.">
-              <Path Data="{StaticResource IconClose}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" Width="14" Height="14" Stretch="Uniform" />
-            </Button>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+              <Button Classes="secondary" Content="{Binding HasRegion, Converter={x:Static vm:Converters.SelectLabel}}" Command="{Binding SelectRegionCommand}"
+                      ToolTip.Tip="Drag a box over the exact part of the screen to watch: a chat, an email or a document. Claude only ever sees what is inside the box." />
+              <Button Classes="icon" Command="{Binding ClearRegionCommand}" IsVisible="{Binding HasRegion}"
+                      AutomationProperties.Name="Stop watching this area"
+                      ToolTip.Tip="Stop watching this area. Type stays on; pick a new area whenever you like.">
+                <Path Data="{StaticResource IconClose}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" Width="14" Height="14" Stretch="Uniform" />
+              </Button>
+            </StackPanel>
           </Grid>
         </Border>
 
@@ -144,7 +147,7 @@
         <StackPanel Spacing="12">
           <Grid ColumnDefinitions="*,Auto" Margin="4,4,0,0">
             <TextBlock Classes="eyebrow" Text="SUGGESTIONS" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Classes="ghost" Command="{Binding RegenerateCommand}" IsVisible="{Binding HasSections}" IsEnabled="{Binding IsRecording}"
+            <Button Grid.Column="1" Classes="ghost" Command="{Binding RegenerateCommand}" IsVisible="{Binding HasSections}" IsEnabled="{Binding IsRecording}" Margin="0,0,-6,0"
                     ToolTip.Tip="{Binding RegenerateTip}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <Path Data="{StaticResource IconRefresh}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.9" StrokeLineCap="Round" StrokeJoin="Round" Width="13" Height="13" Stretch="Uniform" />
@@ -176,7 +179,7 @@
                           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <TextBlock Classes="reply" Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
                             <Button Grid.Column="1" Classes="ghost" Classes.done="{Binding JustCopied}" Content="{Binding CopyLabel}"
-                                    Command="{Binding CopyCommand}" IsEnabled="{Binding IsComplete}" VerticalAlignment="Top"
+                                    Command="{Binding CopyCommand}" IsEnabled="{Binding IsComplete}" VerticalAlignment="Top" Margin="0,-3,-6,0"
                                     ToolTip.Tip="Copy this suggestion to the clipboard, ready to paste." />
                           </Grid>
                         </Border>

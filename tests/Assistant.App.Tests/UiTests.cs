@@ -72,7 +72,7 @@ public class UiTests
         "SAY\n• Yeah, Monday morning works for me.\n• Monday's good. Should I come to the main office first?\n" +
         "TYPE\n• Monday works, see you then! Do you want me to bring anything?\n";
 
-    sealed class Rig : IDisposable
+    internal sealed class Rig : IDisposable
     {
         public Engine Engine = null!;
         public FakeSuggester Suggester = new();
@@ -102,7 +102,7 @@ public class UiTests
         public void Dispose() { Window.Close(); Vm.Dispose(); Engine.Dispose(); }
     }
 
-    static void Pump(Func<bool> until, int timeoutMs = 5000)
+    internal static void Pump(Func<bool> until, int timeoutMs = 5000)
     {
         var end = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (!until())
@@ -115,19 +115,19 @@ public class UiTests
         Dispatcher.UIThread.RunJobs();
     }
 
-    static void Settle()
+    internal static void Settle()
     {
         for (int i = 0; i < 4; i++) { Dispatcher.UIThread.RunJobs(); AvaloniaHeadlessPlatform.ForceRenderTimerTick(); Thread.Sleep(20); }
     }
 
-    static void Shot(TopLevel window, string name)
+    internal static void Shot(TopLevel window, string name)
     {
         Settle();
         Directory.CreateDirectory(ShotDir);
         window.CaptureRenderedFrame()!.Save(Path.Combine(ShotDir, name + ".png"));
     }
 
-    static void Theme(ThemeVariant v) => Application.Current!.RequestedThemeVariant = v;
+    internal static void Theme(ThemeVariant v) => Application.Current!.RequestedThemeVariant = v;
 
     // ---------------------------------------------------------------------------------------
 

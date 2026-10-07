@@ -274,3 +274,94 @@ public class SingleInstanceTests
         Assert.NotNull(again);
     }
 }
+
+public class SpeechRuntimeTests : IDisposable
+{
+    private readonly string _folder = Path.Combine(Path.GetTempPath(), "speechruntime-" + Guid.NewGuid().ToString("N"));
+
+    public void Dispose() { try { Directory.Delete(_folder, true); } catch { } }
+
+    private static IReadOnlyDictionary<string, Func<Stream>> Fake(params (string Name, string Text)[] items) =>
+        items.ToDictionary(i => i.Name, i => (Func<Stream>)(() => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(i.Text))));
+
+    [Fact]
+    public void The_built_app_carries_both_speech_engines()
+    {
+        // The .exe has no loose libraries beside it, so these embedded copies are all the speech engine has.
+        var names = typeof(SpeechRuntime).Assembly.GetManifestResourceNames().Where(n => n.StartsWith("native/")).ToList();
+        foreach (var dll in new[] { "whisper.dll", "ggml-whisper.dll", "ggml-base-whisper.dll", "ggml-cpu-whisper.dll" })
+        {
+            Assert.Contains("native/win-x64/" + dll, names);
+            Assert.Contains("native/noavx/win-x64/" + dll, names);
+        }
+        Assert.True(SpeechRuntime.IsEmbedded);
+    }
+
+    [Fact]
+    public void Unpacks_the_real_embedded_libraries_and_is_repeatable()
+    {
+        var files = SpeechRuntime.Extract(_folder, typeof(SpeechRuntime).Assembly);
+        Assert.All(files, f => Assert.True(File.Exists(f), f));
+        var whisper = Path.Combine(_folder, "runtimes", "win-x64", "whisper.dll");
+        var noAvx = Path.Combine(_folder, "runtimes", "noavx", "win-x64", "whisper.dll");
+        Assert.True(File.Exists(whisper));
+        Assert.True(File.Exists(noAvx));
+        Assert.True(new FileInfo(whisper).Length > 100_000); // the real library, not a stub
+
+        var stamp = File.GetLastWriteTimeUtc(whisper);
+        SpeechRuntime.Extract(_folder, typeof(SpeechRuntime).Assembly);
+        Assert.Equal(stamp, File.GetLastWriteTimeUtc(whisper)); // an intact copy isn't rewritten
+        Assert.Empty(Directory.GetFiles(_folder, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public void A_damaged_copy_is_replaced()
+    {
+        var resources = Fake(("native/win-x64/whisper.dll", "the real library"));
+        SpeechRuntime.Extract(_folder, resources);
+        var path = Path.Combine(_folder, "runtimes", "win-x64", "whisper.dll");
+        File.WriteAllText(path, "cut sh"); // e.g. a download manager or antivirus cut it short
+        SpeechRuntime.Extract(_folder, resources);
+        Assert.Equal("the real library", File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void The_visual_cpp_runtime_goes_next_to_every_engine()
+    {
+        var files = SpeechRuntime.Extract(_folder, Fake(
+            ("native/win-x64/whisper.dll", "a"), ("native/noavx/win-x64/whisper.dll", "b"),
+            ("native/vc/msvcp140.dll", "c"), ("native/vc/vcruntime140.dll", "d")));
+        foreach (var dir in new[] { "win-x64", Path.Combine("noavx", "win-x64") })
+        {
+            Assert.True(File.Exists(Path.Combine(_folder, "runtimes", dir, "msvcp140.dll")), dir);
+            Assert.True(File.Exists(Path.Combine(_folder, "runtimes", dir, "vcruntime140.dll")), dir);
+        }
+        Assert.Equal(6, files.Count);
+    }
+
+    [Fact]
+    public void A_folder_name_with_non_english_letters_works()
+    {
+        var folder = Path.Combine(_folder, "José Иван");
+        SpeechRuntime.Extract(folder, Fake(("native/win-x64/whisper.dll", "x")));
+        Assert.True(File.Exists(Path.Combine(folder, "runtimes", "win-x64", "whisper.dll")));
+    }
+
+    [Fact]
+    public void An_unwritable_place_says_so_instead_of_hiding_it()
+    {
+        // A file where the folder should be: nothing can be created below it.
+        Directory.CreateDirectory(_folder);
+        var blocker = Path.Combine(_folder, "blocked");
+        File.WriteAllText(blocker, "x");
+        Assert.ThrowsAny<IOException>(() => SpeechRuntime.Extract(blocker, Fake(("native/win-x64/whisper.dll", "x"))));
+    }
+
+    [Fact]
+    public void Missing_engine_files_are_explained_with_where_to_look()
+    {
+        var text = SpeechModel.Explain(new FileNotFoundException("Native Library not found"), SpeechAccuracy.Fast);
+        Assert.Contains("Security software", text);
+        Assert.Contains(SpeechRuntime.Folder, text);
+    }
+}

@@ -1,6 +1,6 @@
 """Fails if a published build depends on a DLL that a clean Windows 10/11 PC doesn't have.
 
-Every native .dll/.exe under the folder is read for its import table (including delay-loaded
+Every native .dll/.exe under the folder (the speech engine files and graphics libraries the app unpacks when it runs) is read for its import table (including delay-loaded
 imports). Each imported DLL must be
 
   * shipped in the app folder (or next to the importing file), or

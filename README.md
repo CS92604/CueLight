@@ -11,17 +11,19 @@ in words that sound like a person.
 
 ## Get started
 
-1. Download `ClaudeLiveAssistant-win-x64.zip` from the latest [release](../../releases/latest),
-   unzip it, and run `ClaudeLiveAssistant.exe`. Nothing to install, not even .NET.
+1. Download `ClaudeLiveAssistant.exe` from the latest [release](../../releases/latest) and
+   double-click it. It is one file: nothing to unzip or install, not even .NET.
 2. Paste your Claude API key ([get one here](https://console.anthropic.com/settings/keys)).
    That's the only setup.
 3. The first launch downloads a speech model (about 140 MB, once). The status line shows progress.
 
 Windows may show a "protected your PC" prompt because the app isn't code-signed yet:
-choose **More info → Run anyway**.
+choose **More info**, then **Run anyway**.
 
 **Runs on** 64-bit Windows 10 (1607 or later) and Windows 11 on Intel/AMD, with no installs:
-the zip carries the .NET runtime and the Visual C++ runtime. PCs without AVX2 (older or
+the .exe carries the .NET runtime and the Visual C++ runtime inside it. (On first start it unpacks
+the speech engine to `%LOCALAPPDATA%\Claude Live Assistant\runtime`, and .NET unpacks the graphics
+libraries to a folder under `%TEMP%`; neither needs administrator rights.) PCs without AVX2 (older or
 low-end processors) use a slower build of the speech engine automatically, and PCs with four or
 fewer processor cores start on the fastest speech model. ARM PCs run it through Windows'
 x64 emulation (I haven't tried one). Windows 7, 8 and 32-bit Windows aren't supported.
@@ -153,14 +155,15 @@ Needs the [.NET 8 SDK](https://dotnet.microsoft.com/download).
 ```bash
 dotnet test                                   # unit + headless UI tests (any OS)
 dotnet run --project src/Assistant.App        # run it (listening and text-area watching need Windows)
-dotnet publish src/Assistant.App -c Release -r win-x64 --self-contained -o publish
+dotnet publish src/Assistant.App -c Release -r win-x64 -o publish   # -> publish/ClaudeLiveAssistant.exe, one file
 ```
 
 The **Build** GitHub Actions workflow runs the tests (on Linux and on Windows), builds the
-Windows zip, checks that nothing in it needs a DLL a clean Windows PC lacks
-(`packaging/check-deps.py`), runs the self-test above on a real Windows machine, and uploads the
-result. Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also publishes it
-as a [release](../../releases) with the zip and a SHA-256 file attached.
+single `.exe`, fails if the publish folder holds anything else, copies the `.exe` alone into an empty
+folder and runs the self-test above from there on a real Windows machine, checks that nothing it
+unpacked needs a DLL a clean Windows PC lacks (`packaging/check-deps.py`), and uploads the result.
+Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also publishes it as a
+[release](../../releases) whose only file is `ClaudeLiveAssistant.exe` (its SHA-256 is in the notes).
 
 ## How it's put together
 
@@ -168,4 +171,4 @@ as a [release](../../releases) with the zip and a SHA-256 file attached.
 |---|---|
 | `src/Assistant.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
 | `src/Assistant.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 130 core tests (including the real SDK against a local fake server) and 48 app tests: headless UI tests that render the windows, drive the area picker with simulated input and check every control has hover text, plus the model downloader, single-instance and start-up logic. |
+| `tests/` | 130 core tests (including the real SDK against a local fake server) and 80 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |

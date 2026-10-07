@@ -172,6 +172,15 @@
     <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
   </Style>
 
+  <Style Selector="Button.primary:disabled">
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+  </Style>
+  <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
   <Style Selector="Button.secondary">
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />

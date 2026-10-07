@@ -44,13 +44,14 @@ public static class SpeechModel
                 $"Couldn't download the speech model: it needs one connection to huggingface.co. Check your internet, proxy or firewall and press Retry. {ManualHelp(accuracy)}",
             UnauthorizedAccessException =>
                 $"Windows wouldn't let the app save the speech model in {Folder}. Free up that folder or run the app from another user account.",
+            DllNotFoundException or BadImageFormatException or EntryPointNotFoundException or FileNotFoundException { FileName: null or "" } =>
+                $"The speech engine couldn't start. Security software may have blocked or removed its files in {SpeechRuntime.Folder}: allow that folder (or the app) and press Retry. "
+                + "If that doesn't help, install the \"Microsoft Visual C++ Redistributable (x64)\" from microsoft.com.",
             IOException io when (io.HResult & 0xFFFF) == 112 =>
                 $"There isn't enough free disk space for the speech model (about {approx / 1_000_000} MB). Free some space and press Retry.",
             IOException io when io.Message.Contains("incomplete", StringComparison.OrdinalIgnoreCase) => io.Message,
             IOException io => $"Couldn't save the speech model: {io.Message} Press Retry. {ManualHelp(accuracy)}",
             OutOfMemoryException => "This PC doesn't have enough free memory for that speech model. Choose Fast in Settings.",
-            DllNotFoundException or BadImageFormatException or EntryPointNotFoundException =>
-                "The speech engine couldn't start. A Windows component is missing: install the \"Microsoft Visual C++ Redistributable (x64)\" from microsoft.com, then press Retry.",
             _ => $"Couldn't set up speech recognition: {ex.Message}",
         };
     }
@@ -155,6 +156,7 @@ public sealed class WhisperSpeechToText : ISpeechToText, IDisposable
 
     public WhisperSpeechToText(string modelPath)
     {
+        SpeechRuntime.Prepare(); // unpack the engine's libraries from inside the .exe the first time
         try
         {
             (_factory, _processor) = Build(() => WhisperFactory.FromPath(modelPath));

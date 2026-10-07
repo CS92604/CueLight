@@ -15,7 +15,7 @@ using NAudio.Wave;
 namespace Assistant.App;
 
 /// <summary>
-/// <c>ClaudeLiveAssistant.exe --self-test --out &lt;folder&gt; [--models &lt;folder&gt;] [--wav file --expect word] [--noavx]</c>
+/// <c>ClaudeLiveAssistant.exe --self-test --out &lt;folder&gt; [--models &lt;folder&gt;] [--wav file --expect word] [--noavx] [--require-vc]</c>
 ///
 /// Checks, on the PC it runs on, the parts that differ between Windows machines: the speech engine's
 /// native libraries (and, with <c>--noavx</c>, the build for CPUs without AVX2), real speech turned
@@ -50,7 +50,8 @@ internal static class SelfTest
             Line("Forcing the build for CPUs without AVX.");
         }
 
-        Step("speech engine", () => Speech(Arg(args, "--wav"), Arg(args, "--expect")), essential: true);
+        Line($"Running as: {Environment.ProcessPath} · single file: {string.IsNullOrEmpty(typeof(SelfTest).Assembly.Location)}");
+        Step("speech engine", () => Speech(Arg(args, "--wav"), Arg(args, "--expect"), args.Contains("--require-vc")), essential: true);
         Step("sound devices", Audio, essential: false);
         Step("screen capture", ScreenCapture, essential: false);
 
@@ -93,12 +94,28 @@ internal static class SelfTest
 
     // -- the parts ------------------------------------------------------------------------------
 
-    private static void Speech(string? wav, string? expect)
+    private static void Speech(string? wav, string? expect, bool requireVc)
     {
         var path = SpeechModel.EnsureAsync(SpeechAccuracy.Fast, null, CancellationToken.None).GetAwaiter().GetResult();
         Line($"ok    speech model present ({new FileInfo(path).Length / 1_000_000} MB)");
         using var stt = new WhisperSpeechToText(path);
         Line($"ok    speech engine loaded: {Whisper.net.LibraryLoader.RuntimeOptions.LoadedLibrary}");
+
+        // Where did each library come from? The app's own unpacked copies are what must be in use, so the
+        // result doesn't depend on what else is installed on this PC.
+        var modules = SpeechRuntime.LoadedModules().ToList();
+        foreach (var m in modules) Line("      " + m);
+        if (SpeechRuntime.IsEmbedded)
+        {
+            Line($"ok    speech engine unpacked to {SpeechRuntime.Folder} (Visual C++ runtime included: {SpeechRuntime.HasVisualCppRuntime})");
+            if (requireVc)
+            {
+                if (!SpeechRuntime.HasVisualCppRuntime) throw new InvalidOperationException("the Visual C++ runtime isn't inside the app");
+                var outside = modules.Where(m => !m.Contains(SpeechRuntime.Folder, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (outside.Count > 0 || !modules.Any(m => m.StartsWith("msvcp140", StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("some speech libraries came from outside the app's own copies: " + string.Join("; ", outside));
+            }
+        }
 
         float[] audio = wav is not null && File.Exists(wav) ? ReadWav(wav) : Tone();
         var text = stt.TranscribeAsync(audio, CancellationToken.None).GetAwaiter().GetResult();

@@ -27,12 +27,12 @@ public sealed class SingleInstance : IDisposable
     {
         try
         {
-            var mutex = new Mutex(false, Prefix + name + ".lock");
-            bool owned;
-            try { owned = mutex.WaitOne(0); }
-            catch (AbandonedMutexException) { owned = true; } // the previous copy crashed; we own it now
+            // Whoever creates the named mutex first is the first copy. (Asking "can I wait on it?" instead
+            // would say yes to the same thread twice, since Windows mutexes can be re-entered.) If that
+            // copy crashes, Windows closes its handle and the name is free again.
+            var mutex = new Mutex(true, Prefix + name + ".lock", out bool createdNew);
             var show = new EventWaitHandle(false, EventResetMode.AutoReset, Prefix + name + ".show");
-            if (owned) return new SingleInstance(mutex, show);
+            if (createdNew) return new SingleInstance(mutex, show);
             show.Set();
             show.Dispose();
             mutex.Dispose();

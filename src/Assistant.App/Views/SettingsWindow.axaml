@@ -13,7 +13,7 @@
         ExtendClientAreaChromeHints="PreferSystemChrome"
         ExtendClientAreaTitleBarHeightHint="-1">
   <DockPanel>
-    <Grid x:Name="Header" DockPanel.Dock="Top" Height="54" Margin="24,0,0,0" Background="Transparent">
+    <Grid x:Name="Header" DockPanel.Dock="Top" Height="54" Margin="22,0,0,0" Background="Transparent">
       <TextBlock Classes="title" Text="Settings" VerticalAlignment="Center" IsHitTestVisible="False" />
     </Grid>
 
@@ -32,18 +32,22 @@
           <TextBlock Classes="eyebrow" Text="CLAUDE API KEY" />
           <Border Classes="card">
             <StackPanel Spacing="12">
-              <Grid ColumnDefinitions="*,Auto,Auto" IsVisible="{Binding !IsEditingKey}" ColumnSpacing="6">
+              <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !IsEditingKey}">
                 <TextBlock Text="{Binding MaskedKey}" FontFamily="Consolas, 'Cascadia Mono', Menlo, monospace" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Classes="secondary" Content="Change" Command="{Binding ChangeKeyCommand}" Padding="12,6"
-                        ToolTip.Tip="Replace the saved key with a different one." />
-                <Button Grid.Column="2" Classes="ghost" Content="Remove" Command="{Binding RemoveKeyCommand}" IsVisible="{Binding HasKey}"
-                        ToolTip.Tip="Remove the saved key from this PC. You will be asked for a key again." />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                  <Button Classes="secondary" Content="Change" Command="{Binding ChangeKeyCommand}" Padding="12,6"
+                          ToolTip.Tip="Replace the saved key with a different one." />
+                  <!-- A text button: its words line up with the card's inset on the right, as the key does on the left. -->
+                  <Button Classes="ghost" Content="Remove" Command="{Binding RemoveKeyCommand}" IsVisible="{Binding HasKey}" Margin="0,0,-10,0"
+                          ToolTip.Tip="Remove the saved key from this PC. You will be asked for a key again." />
+                </StackPanel>
               </Grid>
               <StackPanel Spacing="10" IsVisible="{Binding IsEditingKey}">
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBox Classes="field" Text="{Binding KeyEntry.Key}" PasswordChar="{Binding KeyEntry.PasswordChar}" Watermark="sk-ant-…"
+                <Grid>
+                  <TextBox Classes="field" Text="{Binding KeyEntry.Key}" PasswordChar="{Binding KeyEntry.PasswordChar}" Watermark="sk-ant-…" Padding="12,10,44,10"
                            ToolTip.Tip="Your Claude API key, from console.anthropic.com. It is stored encrypted on this PC and only ever sent to Anthropic." />
-                  <Button Grid.Column="1" Classes="icon" Command="{Binding KeyEntry.ToggleRevealCommand}" Margin="4,0,0,0" ToolTip.Tip="Show or hide the key">
+                  <Button Classes="icon" Command="{Binding KeyEntry.ToggleRevealCommand}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"
+                          AutomationProperties.Name="Show or hide the key" ToolTip.Tip="Show or hide the key">
                     <Path Data="{StaticResource IconEye}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round" Width="17" Height="17" Stretch="Uniform" />
                   </Button>
                 </Grid>
@@ -130,7 +134,7 @@
                 <TextBlock Classes="small" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" IsVisible="{Binding !HideSupported}"
                            Text="Not available on this PC (needs Windows 10 version 2004 or later)." />
               </StackPanel>
-              <ToggleSwitch Grid.Column="1" IsChecked="{Binding HideFromCapture}" IsEnabled="{Binding HideSupported}" OnContent="" OffContent="" Margin="12,0,0,0" />
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding HideFromCapture}" IsEnabled="{Binding HideSupported}" OnContent="" OffContent="" Margin="12,0,-12,0" VerticalAlignment="Center" />
             </Grid>
           </Border>
         </StackPanel>
@@ -145,10 +149,10 @@
                 <TextBlock Text="Include my microphone" FontWeight="SemiBold" />
                 <TextBlock Classes="muted small" TextWrapping="Wrap" Text="So Claude knows what you've already said. Use headphones, or your mic will pick up the speakers too." />
               </StackPanel>
-              <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseMicrophone}" OnContent="" OffContent="" Margin="12,0,0,0" />
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseMicrophone}" OnContent="" OffContent="" Margin="12,0,-12,0" VerticalAlignment="Center" />
             </Grid>
           </Border>
-          <TextBlock Text="Speech recognition" FontWeight="SemiBold" Margin="2,6,0,0" Background="Transparent"
+          <TextBlock Text="Speech recognition" FontWeight="SemiBold" Margin="0,6,0,0" Background="Transparent"
                      ToolTip.Tip="Which model turns speech into text on this PC. Bigger is more accurate but slower. A model downloads once, the first time it is used." />
           <ListBox Classes="choices" ItemsSource="{x:Static vm:SettingsViewModel.SpeechItems}" SelectedItem="{Binding SelectedSpeech}">
             <ListBox.ItemTemplate>
