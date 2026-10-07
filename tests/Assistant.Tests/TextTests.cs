@@ -36,14 +36,16 @@ public class ConversationTests
     }
 
     [Fact]
-    public void A_long_call_is_sent_in_full_by_default()
+    public void A_long_call_is_limited_to_the_recent_part_by_default()
     {
         var c = new Conversation();
+        var o = new EngineOptions();
         for (int i = 0; i < 1000; i++)           // roughly 100,000 characters: well over an hour of talk
             c.Add(i % 2 == 0 ? Speaker.Them : Speaker.Me, $"Turn number {i} with a sentence of ordinary speech in it, about this long.");
-        var text = c.Render(new EngineOptions().TranscriptChars);
-        Assert.DoesNotContain("[earlier conversation omitted]", text);
-        Assert.Contains("Turn number 0 ", text);
+        var text = c.Window(o.TranscriptChars, o.TranscriptKeepChars);
+        Assert.True(text.Length <= o.TranscriptChars, $"{text.Length} characters");
+        Assert.StartsWith("[earlier conversation omitted]", text);
+        Assert.DoesNotContain("Turn number 0 ", text);
         Assert.Contains("Turn number 999 ", text);
     }
 
@@ -111,12 +113,12 @@ public class SettingsTests
     {
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         var store = new SettingsStore(dir);
-        store.Save(new Settings { Professionalism = Professionalism.Casual, Options = 1, CustomInstructions = "hi", Model = "claude-haiku-4-5" });
+        store.Save(new Settings { Professionalism = Professionalism.Casual, Options = 1, CustomInstructions = "hi", Model = "claude-haiku-5-5" });
         var loaded = new SettingsStore(dir).Load();
         Assert.Equal(Professionalism.Casual, loaded.Professionalism);
         Assert.Equal(1, loaded.Options);
         Assert.Equal("hi", loaded.CustomInstructions);
-        Assert.Equal("claude-haiku-4-5", loaded.Model);
+        Assert.Equal("claude-haiku-5-5", loaded.Model);
         Assert.Contains("\"Casual\"", File.ReadAllText(Path.Combine(dir, "settings.json")));
     }
 
@@ -231,7 +233,7 @@ public class PromptTests
     [Fact]
     public void System_prompt_says_claude_only_ever_sees_the_current_picture()
     {
-        Assert.Contains("whole conversation so far", Prompting.SystemPrompt);
+        Assert.Contains("recent conversation", Prompting.SystemPrompt);
         Assert.Contains("never shown earlier versions", Prompting.SystemPrompt);
         Assert.Contains("rejected_suggestions", Prompting.SystemPrompt);
         Assert.Contains("Panic", Prompting.SystemPrompt);

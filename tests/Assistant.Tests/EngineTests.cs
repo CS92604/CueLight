@@ -10,6 +10,7 @@ sealed class FakeSuggester : ISuggester
     public readonly ManualResetEventSlim FirstChunkSent = new();
     public Exception? Throw;
     public string[] Chunks = { "SAY\n• one", "\n• two" };
+    public TokenUsage? Report;                         // what the "API" says the request used
 
     public async IAsyncEnumerable<string> StreamAsync(SuggestionRequest request, [EnumeratorCancellation] CancellationToken ct)
     {
@@ -24,6 +25,7 @@ sealed class FakeSuggester : ISuggester
                 await Task.Run(() => Gate.Wait(TimeSpan.FromSeconds(3), ct), ct);
             }
         }
+        if (Report is not null) request.OnUsage?.Invoke(Report);
     }
 }
 
@@ -101,6 +103,46 @@ public class EngineTests : IDisposable
         Assert.Null(call.RegionPng);
         Assert.Contains("Them: Can you tell me about your last project?", call.Transcript);
         Assert.Equal("SAY\n• one\n• two", string.Concat(rec.Events.Where(e => e.Kind == EngineEventKind.Chunk).Select(e => e.Text)));
+    }
+
+    [Fact]
+    public void What_each_request_used_is_added_up_and_announced()
+    {
+        var sug = new FakeSuggester { Report = new TokenUsage("claude-sonnet-5-5", 100, 500, 4_000, 300) };
+        var (eng, _, rec) = Make(sug: sug);
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");
+        rec.WaitFor(EngineEventKind.Usage);
+
+        var u = eng.Usage.Snapshot();
+        Assert.Equal(1, u.Requests);
+        Assert.Equal((100, 500, 4_000, 300), (u.Input, u.CacheWrite, u.CacheRead, u.Output));
+        // 100 x $2 + 500 x $2.50 + 4,000 x $0.10 + 300 x $10 per million
+        Assert.Equal(0.00485m, u.Cost);
+        Assert.False(u.Unpriced);
+    }
+
+    [Fact]
+    public void Clearing_the_chat_does_not_reset_what_has_been_spent()
+    {
+        var sug = new FakeSuggester { Report = new TokenUsage("claude-sonnet-5-5", 1_000, 0, 0, 100) };
+        var (eng, _, rec) = Make(sug: sug);
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");
+        rec.WaitFor(EngineEventKind.Usage);
+        eng.ClearConversation();
+        Assert.Equal(1, eng.Usage.Snapshot().Requests);
+    }
+
+    [Fact]
+    public void Requests_carry_only_the_recent_part_of_a_long_call()
+    {
+        var (eng, sug, rec) = Make(o => { o.TranscriptChars = 3_000; o.TranscriptKeepChars = 2_000; });
+        for (int i = 0; i < 100; i++) eng.Conversation.Add(i % 2 == 0 ? Speaker.Me : Speaker.Them, $"Turn {i}: " + new string('x', 90));
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");
+        rec.WaitFor(EngineEventKind.SuggestEnd);
+        var call = Assert.Single(sug.Calls);
+        Assert.True(call.Transcript.Length <= 3_000, $"{call.Transcript.Length} characters");
+        Assert.StartsWith("[earlier conversation omitted]", call.Transcript);
+        Assert.EndsWith("Can you tell me about your last project?", call.Transcript);
     }
 
     [Fact]

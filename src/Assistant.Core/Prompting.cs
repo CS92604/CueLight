@@ -13,7 +13,15 @@ public sealed record SuggestionRequest(
     Trigger Trigger,
     string? Hint = null,
     byte[]? RegionPng = null,
-    IReadOnlyList<string>? Rejected = null);
+    IReadOnlyList<string>? Rejected = null)
+{
+    /// <summary>Called with what the request cost in tokens, once it is over (finished or cut off).</summary>
+    public Action<TokenUsage>? OnUsage { get; init; }
+}
+
+/// <summary>One piece of the message sent to Claude. <see cref="CacheAfter"/> marks the end of the part Claude may
+/// remember between requests.</summary>
+public sealed record PromptBlock(string Text, bool CacheAfter = false);
 
 public static class Prompting
 {
@@ -22,7 +30,7 @@ public static class Prompting
         1. A running transcript of what other people are saying out loud ("Them") and sometimes what the user said ("Me"), from automatic speech transcription that may contain errors.
         2. Sometimes an image of a region of the user's screen that they are watching for written messages (chat, email, a document, and so on).
 
-        The transcript is the whole conversation so far, so use anything earlier in it for context. The image is only ever the region as it looks right now: you are never shown earlier versions of it, so never refer to something you "saw before" on screen.
+        The transcript is the recent conversation (on a very long call the oldest part is left out, and a line says so), so use anything earlier in it for context. The image is only ever the region as it looks right now: you are never shown earlier versions of it, so never refer to something you "saw before" on screen.
 
         Your job is to tell the user what to say or type next, in their own voice, so it sounds like a real person wrote it.
 
@@ -58,7 +66,49 @@ public static class Prompting
         - Latency-sensitive; begin your visible answer immediately.
         """;
 
-    public static string BuildUserText(SuggestionRequest r)
+    /// <summary>About this many characters of conversation go into each cacheable block. Small enough that the
+    /// next request only has to pay full price for a little new text; large enough that a long call stays
+    /// well inside the 20 blocks Claude looks back over when it searches for what it remembers.</summary>
+    public const int ChunkChars = 2_000;
+
+    /// <summary>
+    /// Everything that goes before the screen picture, in the order Claude reads it. The front of the
+    /// conversation never changes between requests (only the newest turn is still being added to), so it is
+    /// cut into blocks and a cache marker goes after the last complete one. The next request then pays
+    /// full price only for what came after that marker. Anything that changes every time (the picture, the
+    /// extra direction, the task line) comes after it, in <see cref="TailText"/>.
+    /// </summary>
+    public static IReadOnlyList<PromptBlock> FrontBlocks(SuggestionRequest r)
+    {
+        var blocks = new List<PromptBlock>
+        {
+            new($"<style_settings>\n{r.Settings.ToPrompt()}\n</style_settings>\n\n<conversation_so_far>\n"),
+        };
+        if (r.Transcript.Length == 0)
+        {
+            blocks.Add(new("(no speech yet)\n"));
+            return blocks;
+        }
+
+        var lines = r.Transcript.Split('\n');
+        var chunk = new StringBuilder();
+        int cacheIndex = -1;
+        for (int i = 0; i < lines.Length - 1; i++)   // every line but the newest is final
+        {
+            chunk.Append(lines[i]).Append('\n');
+            if (chunk.Length < ChunkChars) continue;
+            blocks.Add(new(chunk.ToString()));
+            cacheIndex = blocks.Count - 1;
+            chunk.Clear();
+        }
+        chunk.Append(lines[^1]).Append('\n');       // the newest line: it can still grow, so it is never cached
+        blocks.Add(new(chunk.ToString()));
+        if (cacheIndex >= 0) blocks[cacheIndex] = blocks[cacheIndex] with { CacheAfter = true };
+        return blocks;
+    }
+
+    /// <summary>Everything that goes after the screen picture: what changed, the direction, the task.</summary>
+    public static string TailText(SuggestionRequest r)
     {
         var changed = new List<string>();
         if (r.Trigger.HasFlag(Trigger.Speech)) changed.Add("spoken");
@@ -69,11 +119,7 @@ public static class Prompting
             if (r.RegionPng is not null) changed.Add("written");
         }
 
-        var parts = new List<string>
-        {
-            $"<style_settings>\n{r.Settings.ToPrompt()}\n</style_settings>",
-            $"<conversation_so_far>\n{(r.Transcript.Length > 0 ? r.Transcript : "(no speech yet)")}\n</conversation_so_far>",
-        };
+        var parts = new List<string> { "</conversation_so_far>" };
         if (r.RegionPng is not null)
             parts.Add("The attached image is the region of my screen I'm watching for written messages.");
         if (r.Rejected is { Count: > 0 })
@@ -82,6 +128,10 @@ public static class Prompting
         parts.Add(TaskLine(r.Trigger, r.RegionPng is not null) + (r.Hint is { Length: > 0 } ? $"\nExtra direction from me: {r.Hint}" : ""));
         return string.Join("\n\n", parts);
     }
+
+    /// <summary>The whole message as one piece of text (the picture, if any, is sent separately).</summary>
+    public static string BuildUserText(SuggestionRequest r) =>
+        string.Concat(FrontBlocks(r).Select(b => b.Text)) + TailText(r);
 
     private static string TaskLine(Trigger t, bool hasImage)
     {

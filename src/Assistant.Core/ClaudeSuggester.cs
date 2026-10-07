@@ -56,7 +56,18 @@ public sealed class ClaudeSuggester : ISuggester
         SuggestionRequest request, [EnumeratorCancellation] CancellationToken ct)
     {
         var model = request.Settings.Model;
+
+        // Order matters for cost. Claude remembers a request's front part, and pays only a tenth (a twentieth
+        // on some models) of the normal price to read it again, but only if that front is identical next time.
+        // So: the instructions, then the conversation (marked as the end of what to remember), and only then the
+        // things that differ every time (the screen picture, the direction, the task).
         var content = new List<BetaContentBlockParam>();
+        foreach (var block in Prompting.FrontBlocks(request))
+        {
+            var part = new BetaTextBlockParam { Text = block.Text };
+            if (block.CacheAfter) part = part with { CacheControl = new BetaCacheControlEphemeral() };
+            content.Add(part);   // the marker is left off (not sent as null) on every block that doesn't carry one
+        }
         if (request.RegionPng is { } png)
         {
             content.Add(new BetaImageBlockParam
@@ -64,29 +75,67 @@ public sealed class ClaudeSuggester : ISuggester
                 Source = new BetaBase64ImageSource { Data = Convert.ToBase64String(png), MediaType = MediaType.ImagePng },
             });
         }
-        content.Add(new BetaTextBlockParam { Text = Prompting.BuildUserText(request) });
+        content.Add(new BetaTextBlockParam { Text = Prompting.TailText(request) });
 
         var p = new MessageCreateParams
         {
             Model = model,
             MaxTokens = _maxTokens,
-            System = Prompting.SystemPrompt,
+            System = new List<BetaTextBlockParam>
+            {
+                new() { Text = Prompting.SystemPrompt, CacheControl = new BetaCacheControlEphemeral() },
+            },
             Messages = [new BetaMessageParam { Role = Role.User, Content = content }],
         };
-        // `effort` is not accepted by Haiku 4.5.
-        if (!model.StartsWith("claude-haiku", StringComparison.Ordinal))
+        // `effort` is not accepted by Haiku 4.5 (Haiku 5.5 and the other models take it).
+        if (!model.StartsWith("claude-haiku-4", StringComparison.Ordinal))
             p = p with { OutputConfig = new BetaOutputConfig { Effort = Effort.Low } };
         if (FallbackModels.Contains(model))
             // If the safety classifiers decline, the API re-runs the request on a fallback model.
             p = p with { Betas = [FallbackBeta], Fallbacks = new BetaFallbacksParam(new Default()) };
 
         string? stopReason = null;
-        await foreach (var ev in Client().Beta.Messages.CreateStreaming(p, ct))
+        long input = 0, written = 0, read = 0, output = 0, chars = 0;
+        bool started = false;
+        try
         {
-            if (ev.TryPickContentBlockDelta(out var delta) && delta.Delta.TryPickText(out var text))
-                yield return text.Text;
-            else if (ev.TryPickDelta(out var md))
-                stopReason = md.Delta.StopReason?.Raw() ?? stopReason;
+            await foreach (var ev in Client().Beta.Messages.CreateStreaming(p, ct))
+            {
+                if (ev.TryPickContentBlockDelta(out var delta) && delta.Delta.TryPickText(out var text))
+                {
+                    chars += text.Text.Length;
+                    yield return text.Text;
+                }
+                else if (ev.TryPickStart(out var start))
+                {
+                    var u = start.Message.Usage;
+                    input = u.InputTokens;
+                    written = u.CacheCreationInputTokens ?? 0;
+                    read = u.CacheReadInputTokens ?? 0;
+                    output = u.OutputTokens;
+                    started = true;
+                }
+                else if (ev.TryPickDelta(out var md))
+                {
+                    stopReason = md.Delta.StopReason?.Raw() ?? stopReason;
+                    var u = md.Usage;   // running totals for the whole request
+                    input = u.InputTokens ?? input;
+                    written = u.CacheCreationInputTokens ?? written;
+                    read = u.CacheReadInputTokens ?? read;
+                    output = u.OutputTokens;
+                }
+            }
+        }
+        finally
+        {
+            // Also runs when the request is cut short (a newer one replaced it): what Claude had already read and
+            // written is still billed, so it still counts.
+            if (started && request.OnUsage is { } report)
+            {
+                // A cut-off request never reports its final total; roughly four characters make a token.
+                if (stopReason is null) output = Math.Max(output, chars / 4);
+                report(new TokenUsage(model, input, written, read, output));
+            }
         }
 
         if (stopReason == "refusal") yield return "\n(Claude declined to suggest a reply for this.)";

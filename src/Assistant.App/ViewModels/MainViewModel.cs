@@ -62,6 +62,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _pinOnTop;
     [ObservableProperty] private bool _isRecording = true;
     [ObservableProperty] private bool _typeEnabled;
+    [ObservableProperty] private string _costText = "$0.00";
+    [ObservableProperty] private string _costTip = CostTipFor(new UsageSnapshot(0, 0, 0, 0, 0, 0m, false));
 
     public bool HasTurns => Turns.Count > 0;
     public bool HasSections => Sections.Count > 0;
@@ -212,11 +214,35 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 // Whatever reported this problem works again (a device came back, the screen unlocked).
                 if (Status == StatusKind.Error && StatusText == e.Text) SetListening();
                 break;
+            case EngineEventKind.Usage:
+                var usage = _engine.Usage.Snapshot();
+                CostText = CostLabel(usage);
+                CostTip = CostTipFor(usage);
+                break;
             case EngineEventKind.RegionChanged:
                 HasRegion = e.Region is not null;
                 RegionText = e.Region is { } r ? $"Watching {r}" : NoRegionText;
                 break;
         }
+    }
+
+    /// <summary>The running cost as shown in the corner: an estimate, so it says "≈" (and "+" when part of the use couldn't be priced).</summary>
+    public static string CostLabel(UsageSnapshot u)
+    {
+        if (u.Requests == 0) return "$0.00";
+        var amount = u.Cost < 0.005m ? "<$0.01" : "$" + u.Cost.ToString("0.00", System.Globalization.CultureInfo.CurrentCulture);
+        return "≈ " + amount + (u.Unpriced ? "+" : "");
+    }
+
+    public static string CostTipFor(UsageSnapshot u)
+    {
+        const string Exact = "Your Claude Console (console.anthropic.com) shows the exact amount, and lets you set a monthly spending limit.";
+        if (u.Requests == 0)
+            return "Estimated cost of Claude's suggestions since you opened the app. Nothing has been sent yet. " + Exact;
+        var share = (int)Math.Round(u.CachedShare * 100);
+        return $"Estimated cost of Claude's suggestions since you opened the app: {u.Requests} request{(u.Requests == 1 ? "" : "s")}. "
+             + $"{share}% of what Claude read came from its memory of earlier requests, which costs far less. "
+             + "This is worked out from Anthropic's list prices. " + Exact;
     }
 
     private void Render(bool final)

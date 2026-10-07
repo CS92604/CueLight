@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace Assistant.Core;
 
-public enum EngineEventKind { Turn, SuggestStart, Chunk, SuggestEnd, Status, Error, RegionChanged, ModeChanged, Recovered }
+public enum EngineEventKind { Turn, SuggestStart, Chunk, SuggestEnd, Status, Error, RegionChanged, ModeChanged, Recovered, Usage }
 
 public sealed record EngineEvent(
     EngineEventKind Kind, string? Text = null, Speaker? Speaker = null, Region? Region = null);
@@ -17,10 +17,16 @@ public sealed class EngineOptions
     /// <summary>Max time to hold a spoken request while the watched text is still changing.</summary>
     public TimeSpan MergeHold { get; set; } = TimeSpan.FromSeconds(3);
     /// <summary>
-    /// Safety cap on the transcript sent with each request. Claude gets the whole conversation, so
-    /// this is large (about two hours of speech); only a longer call drops its oldest turns.
+    /// How much conversation, at most, goes with each request (about 5,000 words: over half an hour of talk).
+    /// Every request pays for all of it, so a long call can't be left to grow without limit.
     /// </summary>
-    public int TranscriptChars { get; set; } = 120_000;
+    public int TranscriptChars { get; set; } = 30_000;
+    /// <summary>
+    /// When the conversation passes <see cref="TranscriptChars"/> the oldest turns are dropped until about this
+    /// much is left. Trimming in a jump, rather than a little every time, keeps the start of what Claude is sent
+    /// the same for many requests in a row, so Claude's prompt cache can go on reading it cheaply.
+    /// </summary>
+    public int TranscriptKeepChars { get; set; } = 20_000;
 }
 
 /// <summary>
@@ -34,7 +40,7 @@ public sealed class EngineOptions
 /// Two switches gate everything: <see cref="Paused"/> (recording off: nothing is watched and nothing
 /// is sent) and <see cref="TextEnabled"/> (TYPE off: the region is ignored and only speech is used).
 ///
-/// Each request carries the full transcript but only the current picture of the watched region;
+/// Each request carries the recent conversation but only the current picture of the watched region;
 /// earlier pictures are never kept or resent. <see cref="Panic"/> forces an immediate re-read of
 /// the region, and <see cref="Regenerate"/> redoes the last reply with a different take.
 /// </summary>
@@ -83,6 +89,9 @@ public sealed class Engine : IDisposable
     public EngineOptions Options { get; }
     public Settings Settings { get; set; }
     public Conversation Conversation { get; } = new();
+
+    /// <summary>What the Claude requests of this session have used so far, in tokens and estimated dollars.</summary>
+    public UsageMeter Usage { get; } = new();
     public Region? Region { get; private set; }
 
     /// <summary>Recording is off: nothing is watched, nothing triggers, nothing is sent.</summary>
@@ -357,8 +366,15 @@ public sealed class Engine : IDisposable
         }
 
         var request = new SuggestionRequest(
-            Conversation.Render(Options.TranscriptChars), Settings.Normalized(), kinds, hint, png,
-            rejected.Length > 0 ? rejected : null);
+            Conversation.Window(Options.TranscriptChars, Options.TranscriptKeepChars), Settings.Normalized(), kinds, hint, png,
+            rejected.Length > 0 ? rejected : null)
+        {
+            OnUsage = u =>
+            {
+                Usage.Add(u);
+                Emit(new EngineEvent(EngineEventKind.Usage));
+            },
+        };
         var reply = new System.Text.StringBuilder();
         try
         {

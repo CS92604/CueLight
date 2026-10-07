@@ -50,7 +50,7 @@ public sealed class Settings
         s.Options = Math.Clamp(s.Options, 1, 3);
         s.ReplyLanguage = (s.ReplyLanguage ?? "").Trim();
         s.CustomInstructions = (s.CustomInstructions ?? "").Trim();
-        if (!Models.All.Any(m => m.Id == s.Model)) s.Model = Models.Default;
+        s.Model = Models.Resolve(s.Model);
         if (!Enum.IsDefined(Professionalism)) s.Professionalism = Professionalism.Professional;
         if (!Enum.IsDefined(Proficiency)) s.Proficiency = Proficiency.Fluent;
         if (!Enum.IsDefined(Tone)) s.Tone = Tone.Warm;
@@ -123,17 +123,34 @@ public sealed record ModelChoice(string Id, string Name, string Blurb, string Ti
 
 public static class Models
 {
-    public const string Default = "claude-opus-5-5";
+    /// <summary>Sonnet: very good replies at half the price of Opus. Cost matters here because the app asks Claude
+    /// again after nearly every sentence it hears.</summary>
+    public const string Default = "claude-sonnet-5-5";
 
     public static readonly IReadOnlyList<ModelChoice> All = new[]
     {
-        new ModelChoice("claude-opus-5-5", "Claude Opus 5.5", "Best replies",
-            "The most capable model: the best replies. A little slower and costs more for each suggestion."),
-        new ModelChoice("claude-sonnet-5-5", "Claude Sonnet 5.5", "Faster, lower cost",
-            "A good balance: noticeably faster than Opus and cheaper, with very good replies."),
-        new ModelChoice("claude-haiku-4-5", "Claude Haiku 4.5", "Fastest, lowest cost",
-            "The fastest and cheapest. Good for quick, simple replies; less nuanced than the others."),
+        new ModelChoice("claude-opus-5-5", "Claude Opus 5.5", "Best replies · 2× the cost",
+            "The most capable model: the best replies. A little slower, and it costs twice as much as Sonnet for each suggestion."),
+        new ModelChoice("claude-sonnet-5-5", "Claude Sonnet 5.5", "Recommended",
+            "The recommended balance: very good replies, quick, and half the cost of Opus."),
+        new ModelChoice("claude-haiku-5-5", "Claude Haiku 5.5", "Cheapest · 1/20 the cost",
+            "The fastest and cheapest, about a twentieth of Sonnet's cost. Good for trying the app out or for long calls; less nuanced than the others."),
     };
+
+    // Models the app used to offer, mapped to the one that replaces them (saved settings may still name them).
+    private static readonly Dictionary<string, string> Retired = new(StringComparer.Ordinal)
+    {
+        ["claude-haiku-4-5"] = "claude-haiku-5-5",
+    };
+
+    /// <summary>The model to actually use for a saved id: itself if the app offers it, its replacement if it was
+    /// retired from the list, otherwise the default.</summary>
+    public static string Resolve(string? id)
+    {
+        if (id is not null && All.Any(m => m.Id == id)) return id;
+        if (id is not null && Retired.TryGetValue(id, out var replacement)) return replacement;
+        return Default;
+    }
 }
 
 /// <summary>Reads and writes settings.json; a missing or unreadable file means defaults.</summary>

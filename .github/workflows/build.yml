@@ -187,6 +187,8 @@ jobs:
           **Download ``ClaudeLiveAssistant.exe`` and double-click it.** That is the whole app: one file, nothing to install or unzip.
           Paste your Claude API key on first launch; that is the only setup.
 
+          Claude's API is billed by Anthropic separately from a Claude subscription. The app uses Sonnet 5.5 by default, remembers what it has already read so repeat requests are cheap, and shows a running cost estimate in its top-right corner. See "What it costs" in the README.
+
           Windows 10 or 11, 64-bit. Windows may say "Windows protected your PC" because the app isn't code-signed yet:
           choose **More info**, then **Run anyway**. The first start unpacks the speech engine and downloads a one-time speech model (about 140 MB).
 

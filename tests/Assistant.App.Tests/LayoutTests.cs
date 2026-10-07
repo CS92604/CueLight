@@ -146,6 +146,30 @@ public class LayoutTests
     }
 
     [AvaloniaFact]
+    public void The_running_cost_sits_as_far_from_the_right_edge_as_the_first_switch_does_from_the_left()
+    {
+        using var rig = FullMain();
+        var w = rig.Window;
+        foreach (var width in new[] { 440.0, 420.0 })   // the usual width and the narrowest the window allows
+        {
+            w.Width = width;
+            rig.Vm.CostText = "≈ $12.34";                // a long one
+            UiTests.Settle();
+            double shown = w.ClientSize.Width;
+            var cost = Shown<TextBlock>(w).First(t => t.Text == "≈ $12.34");
+            var pills = Shown<ToggleButton>(w).Where(b => Has(b, "pill")).ToList();
+            var box = Box(cost, w);
+
+            Near(18, shown - box.Right, $"the cost's right gap at {width} wide");
+            Near(Box(pills[0], w).Center.Y, box.Center.Y, "the cost lines up with the switches", 2);
+            Assert.True(box.Left >= Box(pills[1], w).Right, $"the cost overlaps the Type switch at {width} wide");
+            cost.Measure(new Avalonia.Size(double.PositiveInfinity, double.PositiveInfinity));
+            double wanted = cost.DesiredSize.Width - cost.Margin.Left - cost.Margin.Right;   // DesiredSize includes the margin
+            Assert.True(wanted <= box.Width + 0.5, $"the cost is cut short at {width} wide ({box.Width:0} of {wanted:0})");
+        }
+    }
+
+    [AvaloniaFact]
     public void Main_window_without_a_text_area_card_is_still_even()
     {
         using var rig = UiTests.Rig.Make(typeEnabled: true);

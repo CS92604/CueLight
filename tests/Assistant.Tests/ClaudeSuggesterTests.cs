@@ -15,6 +15,8 @@ public sealed class FakeClaudeServer : IDisposable
     public string StopReason = "end_turn";
     public int Status = 200;
     public string[] Deltas = { "SAY\n• Sure, ", "sounds good.\nTYPE\n• Works for me!" };
+    // What the "API" reports having used: input / cache written / cache read tokens at the start, output tokens at the end.
+    public int InputTokens = 10, CacheWritten, CacheRead, OutputTokens = 12;
 
     public FakeClaudeServer()
     {
@@ -57,11 +59,11 @@ public sealed class FakeClaudeServer : IDisposable
             ctx.Response.ContentType = "text/event-stream";
             var sb = new StringBuilder();
             void Ev(string name, object data) => sb.Append("event: ").Append(name).Append("\ndata: ").Append(JsonSerializer.Serialize(data)).Append("\n\n");
-            Ev("message_start", new { type = "message_start", message = new { id = "msg_1", type = "message", role = "assistant", model = "m", content = Array.Empty<object>(), stop_reason = (string?)null, stop_sequence = (string?)null, usage = new { input_tokens = 10, output_tokens = 1 } } });
+            Ev("message_start", new { type = "message_start", message = new { id = "msg_1", type = "message", role = "assistant", model = "m", content = Array.Empty<object>(), stop_reason = (string?)null, stop_sequence = (string?)null, usage = new { input_tokens = InputTokens, cache_creation_input_tokens = CacheWritten, cache_read_input_tokens = CacheRead, output_tokens = 1 } } });
             Ev("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "text", text = "" } });
             foreach (var d in Deltas) Ev("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "text_delta", text = d } });
             Ev("content_block_stop", new { type = "content_block_stop", index = 0 });
-            Ev("message_delta", new { type = "message_delta", delta = new { stop_reason = StopReason, stop_sequence = (string?)null }, usage = new { output_tokens = 12 } });
+            Ev("message_delta", new { type = "message_delta", delta = new { stop_reason = StopReason, stop_sequence = (string?)null }, usage = new { output_tokens = OutputTokens } });
             Ev("message_stop", new { type = "message_stop" });
             await ctx.Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(sb.ToString()));
             ctx.Response.Close();
@@ -96,15 +98,23 @@ public class ClaudeSuggesterTests
         Assert.Contains("server-side-fallback-2026-07-01", headers["anthropic-beta"]);
         Assert.Equal("claude-opus-5-5", body.GetProperty("model").GetString());
         Assert.True(body.GetProperty("stream").GetBoolean());
-        Assert.Contains("SAY", body.GetProperty("system").GetString());
-        Assert.Equal("low", body.GetProperty("output_config").GetProperty("effort").GetString());
+                Assert.Equal("low", body.GetProperty("output_config").GetProperty("effort").GetString());
         Assert.Equal("default", body.GetProperty("fallbacks").GetString());
 
+        // The instructions come first and are marked for Claude to remember; the picture and the task come last.
+        var system = body.GetProperty("system");
+        Assert.Equal(JsonValueKind.Array, system.ValueKind);
+        Assert.Contains("SAY", system[0].GetProperty("text").GetString());
+        Assert.Equal("ephemeral", system[0].GetProperty("cache_control").GetProperty("type").GetString());
+
         var content = body.GetProperty("messages")[0].GetProperty("content");
-        Assert.Equal("image", content[0].GetProperty("type").GetString());
-        Assert.Equal("image/png", content[0].GetProperty("source").GetProperty("media_type").GetString());
-        Assert.Equal("text", content[1].GetProperty("type").GetString());
-        Assert.Contains("<changed>spoken, written</changed>", content[1].GetProperty("text").GetString());
+        var last = content.GetArrayLength() - 1;
+        Assert.Equal("text", content[0].GetProperty("type").GetString());
+        Assert.Contains("<style_settings>", content[0].GetProperty("text").GetString());
+        Assert.Equal("image", content[last - 1].GetProperty("type").GetString());
+        Assert.Equal("image/png", content[last - 1].GetProperty("source").GetProperty("media_type").GetString());
+        Assert.Equal("text", content[last].GetProperty("type").GetString());
+        Assert.Contains("<changed>spoken, written</changed>", content[last].GetProperty("text").GetString());
         Assert.False(body.TryGetProperty("temperature", out _));
         Assert.False(body.TryGetProperty("thinking", out _));
     }

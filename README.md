@@ -83,7 +83,7 @@ screen as it is now.
 | Length / options | Brief · Short · Detailed; 1–3 options per section |
 | Reply language | Empty = match the other person |
 | About me / extra instructions | Free text: who you are, words to avoid… |
-| Claude model | Opus 5.5 (best replies) · Sonnet 5.5 (faster, cheaper) · Haiku 4.5 (fastest) |
+| Claude model | Sonnet 5.5 (recommended, the default) · Opus 5.5 (best replies, twice the cost) · Haiku 5.5 (cheapest, a twentieth of Sonnet) |
 | Hide from screen sharing | Keeps every window of the app out of screen shares, recordings and screenshots. Windows 10 version 2004 or later. Off by default; see Privacy below. |
 | Microphone | Also transcribe your own voice, so Claude knows what you've said. Use headphones. |
 | Speech recognition | Fast · Balanced · Accurate (downloads a different model) |
@@ -102,14 +102,41 @@ Claude's own typefaces are proprietary, so the app bundles open stand-ins:
 ships in `src/Assistant.App/Assets/Fonts`). To use different fonts, change the two
 `FontFamily` entries at the top of `src/Assistant.App/Styles/Theme.axaml`.
 
+## What it costs
+
+Claude's API is billed by Anthropic **separately from a claude.ai subscription** (Pro, Max…). You add
+credit to the account the API key belongs to at [console.anthropic.com](https://console.anthropic.com),
+and you can set a monthly spending limit there. The exact amount you've spent is always in that Console.
+
+The app is built to keep the cost low, and shows a running estimate in the top-right corner of its
+window (rest the mouse on it for the number of requests and how much came from the cache):
+
+- **Sonnet 5.5 is the default**: half the price of Opus 5.5. **Haiku 5.5** costs a twentieth of Sonnet.
+- **Claude remembers what it has already read.** The instructions and the older conversation are sent
+  in a form Claude can cache, so after the first request it re-reads them at a tenth of the usual price
+  (a twentieth on Sonnet and Opus 5.5) and only pays full price for what's new. The conversation, the
+  settings and the instructions come first, and the things that change every time (the screen picture,
+  your direction) come after, so the cached part stays identical from one request to the next.
+- **Only the recent conversation is sent**: up to about 30,000 characters (over half an hour of talk).
+  When a call gets longer, the oldest part is dropped in one go, not a little each time, so the cache
+  isn't broken by a start that keeps moving. A very long monologue keeps only its latest part.
+- **Clear chat** when a new call starts, so it isn't paying to re-read the last one.
+
+Rough figures, from Anthropic's list prices and my own estimate of how many tokens a conversation
+takes (I haven't compared them with a real bill yet, so treat them as a guide, and trust the counter
+in the app and your Console): about **half a cent per suggestion on Sonnet** (a bit more when it
+is also reading a text area), roughly **$1 for an hour of a busy conversation**, with Haiku 5.5 at a
+few cents for the same hour and Opus 5.5 at roughly double Sonnet. Without the cache the same hour
+would have cost roughly three times as much. Turning **Auto-suggest** off (then it only answers when you
+press Send or Panic) or **Type** off (no screen pictures) costs less still.
+
 ## Privacy and responsible use
 
 - Your API key is stored encrypted for your Windows account (DPAPI) and only ever sent to Anthropic.
 - Speech is turned into text **on your PC**. Claude receives the transcript text and, only
   if you've selected one, a picture of that text area.
-- Auto-suggest sends one request per spoken turn or text change, and each one carries the
-  conversation so far, so a long call costs more per suggestion as it goes. Sonnet, Haiku, or
-  turning Auto-suggest off costs less. I haven't measured real costs.
+- Auto-suggest sends a request after nearly every sentence you hear, and API use costs money.
+  See **What it costs** below.
 - Transcription and screen reading make mistakes, and Claude is told never to invent facts or
   experiences about you. Check anything factual before you say or send it.
 - Recording or transcribing other people can require their consent where you live, and many
@@ -171,4 +198,4 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Assistant.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
 | `src/Assistant.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 130 core tests (including the real SDK against a local fake server) and 82 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `tests/` | 159 core tests (including the real SDK against a local fake server) and 85 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |

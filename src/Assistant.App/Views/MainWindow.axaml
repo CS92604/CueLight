@@ -51,6 +51,10 @@
           <TextBlock Text="{Binding TypeEnabled, Converter={x:Static vm:Converters.OnOff}}" FontWeight="Bold" Foreground="{Binding $parent[ToggleButton].Foreground}" />
         </StackPanel>
       </ToggleButton>
+      <!-- What Claude has cost this session. Right-aligned, so it sits as far from the right edge as the first switch does from the left. -->
+      <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding CostText}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                 TextTrimming="CharacterEllipsis" Background="Transparent" Margin="12,0,0,0"
+                 ToolTip.Tip="{Binding CostTip}" />
     </Grid>
 
     <!-- Composer -->

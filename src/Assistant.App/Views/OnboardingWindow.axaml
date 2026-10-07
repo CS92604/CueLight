@@ -5,7 +5,7 @@
         x:DataType="vm:KeyEntryViewModel"
         Title="Claude Live Assistant"
         Icon="avares://ClaudeLiveAssistant/Assets/app.png"
-        Width="520" Height="640" CanResize="False"
+        Width="520" Height="680" CanResize="False"
         WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="PreferSystemChrome"
@@ -44,6 +44,8 @@
 
       <TextBlock Classes="faint small" TextWrapping="Wrap" LineHeight="18" Margin="0,26,0,0"
                  Text="Your key is stored encrypted on this PC and is only ever sent to Anthropic. Speech is turned into text on your PC; only text, and the text area you choose, is sent to Claude." />
+      <TextBlock Classes="faint small" TextWrapping="Wrap" LineHeight="18" Margin="0,10,0,0"
+                 Text="Anthropic bills API use separately from a Claude subscription. A suggestion costs a fraction of a dollar; the app shows the total." />
     </StackPanel>
     </ScrollViewer>
     <Grid x:Name="Header" Height="54" VerticalAlignment="Top" Background="Transparent" />

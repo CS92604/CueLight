@@ -29,6 +29,7 @@ sealed class FakeSuggester : ISuggester
 {
     public string Text = "";
     public ManualResetEventSlim? HoldAfterFirstChunk;
+    public TokenUsage? Report;                         // what the "API" says the request used
     public readonly List<SuggestionRequest> Calls = new();
     public async IAsyncEnumerable<string> StreamAsync(SuggestionRequest request, [EnumeratorCancellation] CancellationToken ct)
     {
@@ -38,6 +39,7 @@ sealed class FakeSuggester : ISuggester
             yield return Text.Substring(i, Math.Min(9, Text.Length - i));
             if (i >= 9 && HoldAfterFirstChunk is not null) await Task.Run(() => HoldAfterFirstChunk.Wait(4000, ct), ct);
         }
+        if (Report is not null) request.OnUsage?.Invoke(Report);
     }
 }
 
@@ -148,6 +150,7 @@ public class UiTests
     public void Say_and_type_suggestions_render_and_copy()
     {
         using var rig = Rig.Make();
+        rig.Suggester.Report = new TokenUsage("claude-sonnet-5-5", 600, 150, 2_400, 220);   // about a third of a cent
         rig.Vm.SetListening();
         rig.Engine.SetRegion(new Region(700, 120, 420, 160));
         rig.Engine.AddTurn(Speaker.Them, "Hey, can you start on Monday morning at nine?");
@@ -460,7 +463,8 @@ public class UiTests
         vm.ToneIndex = 2;
         vm.LengthIndex = 0;
         vm.OptionsIndex = 2;
-        vm.SelectedModel = Models.All[1];
+        Assert.Equal("claude-sonnet-5-5", vm.SelectedModel!.Id);   // the recommended, cheaper model is what a new install uses
+        vm.SelectedModel = Models.All[0];
         vm.UseMicrophone = true;
         vm.ReplyLanguage = "Spanish";
         Assert.Equal(Professionalism.Formal, settings.Professionalism);
@@ -468,7 +472,7 @@ public class UiTests
         Assert.Equal(Tone.Direct, settings.Tone);
         Assert.Equal(ReplyLength.Brief, settings.Length);
         Assert.Equal(3, settings.Options);
-        Assert.Equal("claude-sonnet-5-5", settings.Model);
+        Assert.Equal("claude-opus-5-5", settings.Model);
         Assert.True(settings.UseMicrophone);
         Assert.Equal("Spanish", settings.ReplyLanguage);
         Assert.True(changes >= 8);
@@ -689,6 +693,41 @@ public class UiTests
             Assert.Contains("isn't available", new SettingsViewModel(new Settings(), () => { }, new KeyEntryViewModel(), null, _ => { }).HideTip);
         using (new CaptureSupportStub(true))
             Assert.Contains("screen shares", new SettingsViewModel(new Settings(), () => { }, new KeyEntryViewModel(), null, _ => { }).HideTip);
+    }
+
+    [AvaloniaFact]
+    public void The_running_cost_appears_in_the_corner_and_grows_with_use()
+    {
+        using var rig = Rig.Make();
+        Assert.Equal("$0.00", rig.Vm.CostText);
+        Assert.Contains("Nothing has been sent yet", rig.Vm.CostTip);
+
+        rig.Suggester.Report = new TokenUsage("claude-sonnet-5-5", 1_000, 0, 5_000, 300);   // $0.0020 + $0.0005 + $0.0030
+        rig.Engine.AddTurn(Speaker.Them, "Hey, can you start on Monday morning at nine?");
+        Pump(() => rig.Vm.CostText != "$0.00");
+
+        Assert.Equal("≈ $0.01", rig.Vm.CostText);   // $0.0055 rounds up
+        Assert.Contains("1 request", rig.Vm.CostTip);
+        Assert.Contains("83%", rig.Vm.CostTip);       // 5,000 of 6,000 input tokens were read from the cache
+        Assert.Contains("Claude Console", rig.Vm.CostTip);
+        var shown = Shown(rig.Window, "≈ $0.01");
+        Assert.Equal(rig.Vm.CostTip, ToolTip.GetTip(shown));
+    }
+
+    static TextBlock Shown(Window w, string text) =>
+        w.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == text && t.IsVisible);
+
+    [Fact]
+    public void The_cost_label_rounds_honestly()
+    {
+        UsageSnapshot Cost(decimal c, int requests = 3, bool unpriced = false) => new(requests, 0, 0, 0, 0, c, unpriced);
+        Assert.Equal("$0.00", MainViewModel.CostLabel(Cost(0m, requests: 0)));
+        Assert.Equal("≈ <$0.01", MainViewModel.CostLabel(Cost(0.004m)));
+        Assert.Equal("≈ $0.01", MainViewModel.CostLabel(Cost(0.006m)));
+        Assert.Equal("≈ $1.23", MainViewModel.CostLabel(Cost(1.234m)));
+        Assert.Equal("≈ $12.50+", MainViewModel.CostLabel(Cost(12.5m, unpriced: true)));
+        Assert.Contains("1 request.", MainViewModel.CostTipFor(Cost(0.1m, requests: 1)));
+        Assert.Contains("3 requests.", MainViewModel.CostTipFor(Cost(0.1m, requests: 3)));
     }
 
     [AvaloniaFact]
