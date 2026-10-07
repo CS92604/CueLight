@@ -3,8 +3,13 @@ name: Build
 on:
   push:
     branches: [main, 'claude/**']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to create or update, e.g. v0.2.0 (leave empty to only build)'
+        required: false
   release:
     types: [published]
 
@@ -23,23 +28,70 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
+      INPUT_TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      - name: Work out the tag and version
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = ''
+          if ($env:GITHUB_EVENT_NAME -eq 'release') { $tag = $env:RELEASE_EVENT_TAG }
+          elseif ($env:GITHUB_REF_TYPE -eq 'tag') { $tag = $env:GITHUB_REF_NAME }
+          elseif ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $tag = $env:INPUT_TAG }
+          $version = '0.0.0'
+          if ($tag -match '^v?(\d+\.\d+\.\d+)') { $version = $Matches[1] }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "tag='$tag' version=$version"
+
       - name: Publish
-        run: dotnet publish src/Assistant.App -c Release -r win-x64 --self-contained -o publish
+        shell: pwsh
+        run: |
+          dotnet publish src/Assistant.App -c Release -r win-x64 --self-contained `
+            -p:Version=${{ steps.ver.outputs.version }} -o ClaudeLiveAssistant
+          Remove-Item ClaudeLiveAssistant\*.pdb -ErrorAction SilentlyContinue
+          Copy-Item packaging\README.txt ClaudeLiveAssistant\README.txt
+
       - name: Zip
         shell: pwsh
-        run: Compress-Archive -Path publish\* -DestinationPath ClaudeLiveAssistant-win-x64.zip
+        run: |
+          Compress-Archive -Path ClaudeLiveAssistant -DestinationPath ClaudeLiveAssistant-win-x64.zip
+          $hash = (Get-FileHash ClaudeLiveAssistant-win-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  ClaudeLiveAssistant-win-x64.zip" | Out-File ClaudeLiveAssistant-win-x64.zip.sha256 -Encoding ascii
+          Get-Item ClaudeLiveAssistant-win-x64.zip | Format-List Name, Length
+
       - uses: actions/upload-artifact@v4
         with:
           name: ClaudeLiveAssistant-win-x64
-          path: ClaudeLiveAssistant-win-x64.zip
+          path: |
+            ClaudeLiveAssistant-win-x64.zip
+            ClaudeLiveAssistant-win-x64.zip.sha256
+
       - name: Attach to the release
-        if: github.event_name == 'release'
+        if: steps.ver.outputs.tag != ''
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" ClaudeLiveAssistant-win-x64.zip --clobber
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          $files = @('ClaudeLiveAssistant-win-x64.zip', 'ClaudeLiveAssistant-win-x64.zip.sha256')
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG @files --clobber
+          } else {
+            @'
+          **Windows (64-bit):** download `ClaudeLiveAssistant-win-x64.zip`, unzip it, and run `ClaudeLiveAssistant.exe`.
+          Nothing to install. Paste your Claude API key on first launch; that is the only setup.
+
+          The zip is self-contained (no .NET install needed). Windows may show "Windows protected your PC" because the
+          app isn't code-signed yet: choose **More info → Run anyway**. The `.sha256` file lets you check the download.
+          '@ | Out-File notes.md -Encoding utf8
+            gh release create $env:TAG @files --title "Claude Live Assistant $env:TAG" --notes-file notes.md --generate-notes --target $env:GITHUB_SHA
+          }

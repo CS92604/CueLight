@@ -38,7 +38,8 @@
   <!-- Keep the Windows download lean: the speech runtime ships native libraries for every OS. -->
   <Target Name="PruneForeignRuntimes" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' == 'win-x64'">
     <ItemGroup>
-      <ForeignRuntime Include="$(PublishDir)runtimes\*" Exclude="$(PublishDir)runtimes\win-x64" />
+      <ForeignRuntime Include="$([System.IO.Directory]::GetDirectories('$(PublishDir)runtimes'))" />
+      <ForeignRuntime Remove="@(ForeignRuntime)" Condition="'%(Filename)%(Extension)' == 'win-x64'" />
     </ItemGroup>
     <RemoveDir Directories="@(ForeignRuntime)" />
   </Target>

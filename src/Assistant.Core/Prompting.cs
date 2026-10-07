@@ -3,16 +3,17 @@ using System.Text.RegularExpressions;
 
 namespace Assistant.Core;
 
-/// <summary>Which channel(s) triggered a request.</summary>
+/// <summary>Which channel(s) triggered a request. <c>Forced</c> is the Panic button.</summary>
 [Flags]
-public enum Trigger { None = 0, Speech = 1, Text = 2, Manual = 4 }
+public enum Trigger { None = 0, Speech = 1, Text = 2, Manual = 4, Forced = 8 }
 
 public sealed record SuggestionRequest(
     string Transcript,
     Settings Settings,
     Trigger Trigger,
     string? Hint = null,
-    byte[]? RegionPng = null);
+    byte[]? RegionPng = null,
+    IReadOnlyList<string>? Rejected = null);
 
 public static class Prompting
 {
@@ -21,13 +22,17 @@ public static class Prompting
         1. A running transcript of what other people are saying out loud ("Them") and sometimes what the user said ("Me"), from automatic speech transcription that may contain errors.
         2. Sometimes an image of a region of the user's screen that they are watching for written messages (chat, email, a document, and so on).
 
+        The transcript is the whole conversation so far, so use anything earlier in it for context. The image is only ever the region as it looks right now: you are never shown earlier versions of it, so never refer to something you "saw before" on screen.
+
         Your job is to tell the user what to say or type next, in their own voice, so it sounds like a real person wrote it.
 
         Two channels:
         - SAY: what the user should say out loud in reply to the spoken conversation.
         - TYPE: what the user should type in reply to the written text in the screen region. Treat the newest message not written by the user as the one that needs a reply.
 
-        The <changed> tag says which channel(s) have something new. Include a section only for a channel that has something to respond to. If both changed, give both and keep them consistent with each other. If the user pressed Suggest manually, include whichever channels have something to reply to.
+        The <changed> tag says which channel(s) have something new. Include a section only for a channel that has something to respond to. If both changed, give both and keep them consistent with each other. If the user pressed Suggest manually, include whichever channels have something to reply to. If they pressed Panic, they need a reply right now: read the image as it is at this moment and always answer it, plus SAY if the last spoken line needs an answer.
+
+        If <rejected_suggestions> is present, those are earlier suggestions for this same moment that the user didn't want. Don't repeat them or lightly reword them; take a clearly different angle.
 
         Output format, exactly:
         SAY
@@ -71,6 +76,8 @@ public static class Prompting
         };
         if (r.RegionPng is not null)
             parts.Add("The attached image is the region of my screen I'm watching for written messages.");
+        if (r.Rejected is { Count: > 0 })
+            parts.Add("<rejected_suggestions>\n" + string.Join("\n---\n", r.Rejected) + "\n</rejected_suggestions>");
         parts.Add($"<changed>{string.Join(", ", changed)}</changed>");
         parts.Add(TaskLine(r.Trigger) + (r.Hint is { Length: > 0 } ? $"\nExtra direction from me: {r.Hint}" : ""));
         return string.Join("\n\n", parts);
@@ -78,6 +85,8 @@ public static class Prompting
 
     private static string TaskLine(Trigger t)
     {
+        if (t.HasFlag(Trigger.Forced))
+            return "I pressed the panic button because I need to reply right now. Read the attached region of my screen as it is at this moment, find the newest message not written by me, and give me what to TYPE. If the last thing said out loud also needs an answer, give me what to SAY too.";
         t &= Trigger.Speech | Trigger.Text;
         return t switch
         {

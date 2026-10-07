@@ -11,8 +11,8 @@ in words that sound like a person.
 
 ## Get started
 
-1. Download `ClaudeLiveAssistant-win-x64.zip` (from the latest [release](../../releases), or the
-   **Build** workflow's artifact), unzip it, and run `ClaudeLiveAssistant.exe`. Nothing to install.
+1. Download `ClaudeLiveAssistant-win-x64.zip` from the latest [release](../../releases/latest),
+   unzip it, and run `ClaudeLiveAssistant.exe`. Nothing to install, not even .NET.
 2. Paste your Claude API key ([get one here](https://console.anthropic.com/settings/keys)).
    That's the only setup.
 3. The first launch downloads a speech model (about 140 MB, once). The status line shows progress.
@@ -33,9 +33,24 @@ choose **More info → Run anyway**.
   changing, Claude reads it and suggests what to **type**. Keep the assistant window off the box.
 - **Both at once:** if someone is talking *and* the text area updates, you get a Say section
   and a Type section together, consistent with each other.
+- **Panic** forces Claude to read the text area *right now* and answer it: no waiting for a
+  change, no settle delay, works even with Auto-suggest off. It also gives you something to say
+  if the last thing spoken needs an answer. With no text area picked yet, it asks you to draw
+  one first.
+- **Regenerate** (above the suggestions) redoes the current reply. Claude is shown the replies
+  you threw away and told to take a different angle, so you don't just get a reword. It uses your
+  current settings, so change Tone or Length first if you want. Type a direction in the box
+  first (“shorter”) and it becomes the new instruction.
 - Type a direction in the box at the bottom (“shorter”, “ask about the timeline”) and press
   Enter for a fresh set. Turn **Auto-suggest** off to only get suggestions when you ask.
 - The pin keeps the window on top.
+
+### What Claude sees
+
+Every request carries the **whole conversation so far** as text (about two hours of speech
+before the oldest turns start dropping off), but only the **current picture** of your text
+area. Earlier pictures are never kept or sent again, and Claude is told it only sees the
+screen as it is now.
 
 ## Settings
 
@@ -70,9 +85,9 @@ ships in `src/Assistant.App/Assets/Fonts`). To use different fonts, change the t
 - Your API key is stored encrypted for your Windows account (DPAPI) and only ever sent to Anthropic.
 - Speech is turned into text **on your PC**. Claude receives the transcript text and, only
   if you've selected one, a picture of that text area.
-- Auto-suggest sends one request per spoken turn or text change; a busy hour is roughly a
-  dollar or two on the default model (my estimate, not measured). Sonnet or manual mode
-  costs less.
+- Auto-suggest sends one request per spoken turn or text change, and each one carries the
+  conversation so far, so a long call costs more per suggestion as it goes. Sonnet, Haiku, or
+  turning Auto-suggest off costs less. I haven't measured real costs.
 - Transcription and screen reading make mistakes, and Claude is told never to invent facts or
   experiences about you. Check anything factual before you say or send it.
 - Recording or transcribing other people can require their consent where you live, and many
@@ -89,7 +104,9 @@ dotnet run --project src/Assistant.App        # run it (listening and text-area 
 dotnet publish src/Assistant.App -c Release -r win-x64 --self-contained -o publish
 ```
 
-The **Build** GitHub Actions workflow runs the tests and produces the Windows zip.
+The **Build** GitHub Actions workflow runs the tests and builds the Windows zip on every push.
+Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also publishes it as a
+[release](../../releases) with the zip and a SHA-256 file attached.
 
 ## How it's put together
 
@@ -97,4 +114,4 @@ The **Build** GitHub Actions workflow runs the tests and produces the Windows zi
 |---|---|
 | `src/Assistant.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
 | `src/Assistant.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 77 core tests (including the real SDK against a local fake server) and 14 headless UI tests that render the windows and drive the area picker with simulated input. |
+| `tests/` | 95 core tests (including the real SDK against a local fake server) and 17 headless UI tests that render the windows and drive the area picker with simulated input. |

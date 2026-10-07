@@ -16,7 +16,11 @@ public sealed class EngineOptions
     public TimeSpan Debounce { get; set; } = TimeSpan.FromSeconds(1);
     /// <summary>Max time to hold a spoken request while the watched text is still changing.</summary>
     public TimeSpan MergeHold { get; set; } = TimeSpan.FromSeconds(3);
-    public int TranscriptChars { get; set; } = 8000;
+    /// <summary>
+    /// Safety cap on the transcript sent with each request. Claude gets the whole conversation, so
+    /// this is large (about two hours of speech); only a longer call drops its oldest turns.
+    /// </summary>
+    public int TranscriptChars { get; set; } = 120_000;
 }
 
 /// <summary>
@@ -26,6 +30,10 @@ public sealed class EngineOptions
 /// changing. Requests are coalesced: a newer trigger supersedes one still waiting or streaming,
 /// and the channels that triggered are merged, so if speech and on-screen text change together
 /// Claude is asked for both a SAY and a TYPE reply.
+///
+/// Each request carries the full transcript but only the current picture of the watched region;
+/// earlier pictures are never kept or resent. <see cref="Panic"/> forces an immediate re-read of
+/// the region, and <see cref="Regenerate"/> redoes the last reply with a different take.
 /// </summary>
 public sealed class Engine : IDisposable
 {
@@ -39,6 +47,12 @@ public sealed class Engine : IDisposable
 
     private Trigger _kinds;
     private string? _hint;
+    private bool _immediate;        // skip the merge hold (Panic / Regenerate)
+    private bool _redo;             // the pending run redoes the last reply
+    private Trigger _lastKinds;     // what the most recent run was asked, for Regenerate
+    private string? _lastHint;
+    private string _lastReply = "";
+    private readonly List<string> _rejected = new();   // replies the user has regenerated away
     private double? _deadline;      // seconds on _clock
     private double _queuedAt;
     private CancellationTokenSource? _runCts;
@@ -107,7 +121,8 @@ public sealed class Engine : IDisposable
     }
 
     /// <summary>Ask for a suggestion. With <see cref="Trigger.None"/> this is a manual request.</summary>
-    public void Request(Trigger kinds = Trigger.None, string? hint = null, TimeSpan delay = default)
+    public void Request(Trigger kinds = Trigger.None, string? hint = null, TimeSpan delay = default,
+        bool immediate = false)
     {
         lock (_gate)
         {
@@ -116,9 +131,56 @@ public sealed class Engine : IDisposable
             if (_deadline is null) _queuedAt = Now;
             _deadline = Now + delay.TotalSeconds;
             _hint = hint ?? _hint;
+            _immediate |= immediate;
         }
         _signal.Release();
     }
+
+    /// <summary>
+    /// The Panic button: right now, re-read the watched region and reply to it (and to the last
+    /// thing said, if it needs an answer). Skips the debounce, the settle wait and the auto-suggest
+    /// switch. Returns false, and says why, when there is no region to read.
+    /// </summary>
+    public bool Panic(string? hint = null)
+    {
+        if (Region is null)
+        {
+            Emit(new EngineEvent(EngineEventKind.Status, "Pick a text area first, then Panic can read it."));
+            return false;
+        }
+        Request(Trigger.Manual | Trigger.Forced, hint, immediate: true);
+        return true;
+    }
+
+    /// <summary>
+    /// Redo the last reply: the same kind of request, with the current transcript and settings, and
+    /// the replies already thrown away passed along so Claude takes a different angle. A new
+    /// <paramref name="hint"/> replaces the previous one; without one the previous hint carries over.
+    /// </summary>
+    public void Regenerate(string? hint = null)
+    {
+        lock (_gate)
+        {
+            _runCts?.Cancel();
+            // Cancelling takes effect inside this lock, so a stale chunk can't overwrite the reset below.
+            if (_lastReply.Length > 0 && !_lastReply.StartsWith('('))
+            {
+                _rejected.Add(_lastReply.Length > MaxRejectedChars ? _lastReply[..MaxRejectedChars] : _lastReply);
+                while (_rejected.Count > MaxRejected) _rejected.RemoveAt(0);
+            }
+            _lastReply = "";
+            _kinds |= _lastKinds == Trigger.None ? Trigger.Manual : _lastKinds;
+            _hint = hint ?? _hint ?? _lastHint;
+            _redo = true;
+            _immediate = true;
+            if (_deadline is null) _queuedAt = Now;
+            _deadline = Now;
+        }
+        _signal.Release();
+    }
+
+    private const int MaxRejected = 3;
+    private const int MaxRejectedChars = 1500;
 
     public void ClearConversation()
     {
@@ -129,6 +191,11 @@ public sealed class Engine : IDisposable
             _deadline = null;
             _kinds = Trigger.None;
             _hint = null;
+            _immediate = _redo = false;
+            _lastKinds = Trigger.None;
+            _lastHint = null;
+            _lastReply = "";
+            _rejected.Clear();
         }
         Conversation.Clear();
     }
@@ -142,6 +209,8 @@ public sealed class Engine : IDisposable
         {
             Trigger kinds = Trigger.None;
             string? hint = null;
+            bool redo = false;
+            string[] rejected = Array.Empty<string>();
             CancellationToken runToken = default;
             int epoch = 0;
             TimeSpan wait = Timeout.InfiniteTimeSpan;
@@ -154,12 +223,16 @@ public sealed class Engine : IDisposable
                     double remaining = deadline - Now;
                     if (remaining > 0)
                         wait = TimeSpan.FromSeconds(remaining);
-                    else if (_watcher is { Pending: true } && Now - _queuedAt < Options.MergeHold.TotalSeconds)
+                    else if (!_immediate && _watcher is { Pending: true } && Now - _queuedAt < Options.MergeHold.TotalSeconds)
                         wait = TimeSpan.FromMilliseconds(200); // let the watched text settle so SAY and TYPE arrive together
                     else
                     {
-                        kinds = _kinds; hint = _hint;
+                        kinds = _kinds; hint = _hint; redo = _redo;
                         _kinds = Trigger.None; _hint = null; _deadline = null;
+                        _immediate = _redo = false;
+                        if (!redo) _rejected.Clear(); // a new moment: nothing here was thrown away yet
+                        rejected = _rejected.ToArray();
+                        _lastKinds = kinds; _lastHint = hint; _lastReply = "";
                         _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                         runToken = _runCts.Token;
                         epoch = _clearEpoch;
@@ -168,7 +241,7 @@ public sealed class Engine : IDisposable
                 }
             }
 
-            if (run) await RunAsync(kinds, hint, runToken, epoch);
+            if (run) await RunAsync(kinds, hint, redo, rejected, runToken, epoch);
             else
             {
                 try { await _signal.WaitAsync(wait, ct); }
@@ -177,9 +250,10 @@ public sealed class Engine : IDisposable
         }
     }
 
-    private async Task RunAsync(Trigger kinds, string? hint, CancellationToken ct, int epoch)
+    private async Task RunAsync(Trigger kinds, string? hint, bool redo, string[] rejected, CancellationToken ct, int epoch)
     {
-        Emit(new EngineEvent(EngineEventKind.SuggestStart));
+        Emit(new EngineEvent(EngineEventKind.SuggestStart, redo ? "Trying another take…"
+            : kinds.HasFlag(Trigger.Forced) ? "Reading the text area…" : null));
         byte[]? png = null;
         if (Region is { } region && kinds != Trigger.Speech)
         {
@@ -192,12 +266,20 @@ public sealed class Engine : IDisposable
         }
 
         var request = new SuggestionRequest(
-            Conversation.Render(Options.TranscriptChars), Settings.Normalized(), kinds, hint, png);
+            Conversation.Render(Options.TranscriptChars), Settings.Normalized(), kinds, hint, png,
+            rejected.Length > 0 ? rejected : null);
+        var reply = new System.Text.StringBuilder();
         try
         {
             await foreach (var chunk in _suggester.StreamAsync(request, ct))
             {
                 ct.ThrowIfCancellationRequested();
+                reply.Append(chunk);
+                lock (_gate)
+                {
+                    // Checked under the lock Regenerate cancels in, so a late chunk can't undo its reset.
+                    if (!ct.IsCancellationRequested) _lastReply = reply.ToString();
+                }
                 Emit(new EngineEvent(EngineEventKind.Chunk, chunk));
             }
         }

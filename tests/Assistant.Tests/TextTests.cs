@@ -36,6 +36,18 @@ public class ConversationTests
     }
 
     [Fact]
+    public void A_long_call_is_sent_in_full_by_default()
+    {
+        var c = new Conversation();
+        for (int i = 0; i < 1000; i++)           // roughly 100,000 characters: well over an hour of talk
+            c.Add(i % 2 == 0 ? Speaker.Them : Speaker.Me, $"Turn number {i} with a sentence of ordinary speech in it, about this long.");
+        var text = c.Render(new EngineOptions().TranscriptChars);
+        Assert.DoesNotContain("[earlier conversation omitted]", text);
+        Assert.Contains("Turn number 0 ", text);
+        Assert.Contains("Turn number 999 ", text);
+    }
+
+    [Fact]
     public void Blank_text_is_ignored()
     {
         var c = new Conversation();
@@ -191,6 +203,36 @@ public class PromptTests
     {
         Assert.Contains("<changed>spoken</changed>", Text(Trigger.Manual));
         Assert.Contains("<changed>spoken, written</changed>", Text(Trigger.Manual, new byte[] { 1 }));
+    }
+
+    [Fact]
+    public void Panic_demands_a_reply_to_the_screen_as_it_is_now()
+    {
+        var t = Text(Trigger.Manual | Trigger.Forced, new byte[] { 1 });
+        Assert.Contains("panic button", t);
+        Assert.Contains("what to TYPE", t);
+        Assert.Contains("<changed>spoken, written</changed>", t);
+    }
+
+    [Fact]
+    public void Rejected_replies_are_passed_along_so_a_redo_takes_a_new_angle()
+    {
+        var req = new SuggestionRequest("Them: hi", new Settings(), Trigger.Speech, null, null,
+            new[] { "SAY\n• first try", "SAY\n• second try" });
+        var t = Prompting.BuildUserText(req);
+        Assert.Contains("<rejected_suggestions>", t);
+        Assert.Contains("first try", t);
+        Assert.Contains("second try", t);
+        Assert.DoesNotContain("<rejected_suggestions>", Text(Trigger.Speech));
+    }
+
+    [Fact]
+    public void System_prompt_says_claude_only_ever_sees_the_current_picture()
+    {
+        Assert.Contains("whole conversation so far", Prompting.SystemPrompt);
+        Assert.Contains("never shown earlier versions", Prompting.SystemPrompt);
+        Assert.Contains("rejected_suggestions", Prompting.SystemPrompt);
+        Assert.Contains("Panic", Prompting.SystemPrompt);
     }
 
     [Fact]

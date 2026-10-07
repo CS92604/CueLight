@@ -27,8 +27,10 @@ sealed class FakeSuggester : ISuggester
 {
     public string Text = "";
     public ManualResetEventSlim? HoldAfterFirstChunk;
+    public readonly List<SuggestionRequest> Calls = new();
     public async IAsyncEnumerable<string> StreamAsync(SuggestionRequest request, [EnumeratorCancellation] CancellationToken ct)
     {
+        lock (Calls) Calls.Add(request);
         for (int i = 0; i < Text.Length; i += 9)
         {
             yield return Text.Substring(i, Math.Min(9, Text.Length - i));
@@ -69,6 +71,8 @@ public class UiTests
         public readonly List<string> Copied = new();
         public Settings Settings = new();
 
+        public Func<Task> PickRegion = () => Task.CompletedTask;
+
         public static Rig Make(string reply = BothReply)
         {
             var r = new Rig();
@@ -76,7 +80,7 @@ public class UiTests
             r.Engine = new Engine(new EngineOptions { Debounce = TimeSpan.FromMilliseconds(30) }, r.Suggester, new FakeCapture(), (_, _, _) => new NoWatcher());
             r.Engine.Start();
             r.Vm = new MainViewModel(r.Engine, r.Settings, t => { r.Copied.Add(t); return Task.CompletedTask; },
-                () => Task.CompletedTask, () => { }, () => { }, () => { });
+                () => r.PickRegion(), () => { }, () => { }, () => { });
             r.Window = new MainWindow { DataContext = r.Vm, Width = 440, Height = 780 };
             r.Window.Show();
             return r;
@@ -183,6 +187,59 @@ public class UiTests
         Assert.True(rig.Vm.CanRetry);
         Assert.False(rig.Vm.ShowProgress);
         Shot(rig.Window, "main-error-light");
+    }
+
+    [AvaloniaFact]
+    public void Panic_reads_the_text_area_now_even_with_auto_suggest_off()
+    {
+        using var rig = Rig.Make();
+        rig.Engine.Options.AutoSuggest = false;
+        rig.Engine.SetRegion(new Region(700, 120, 420, 160));
+        rig.Vm.SetListening();
+        rig.Vm.PanicCommand.Execute(null);
+        Pump(() => rig.Vm.Sections.Count > 0 && rig.Vm.IsListening);
+        var call = Assert.Single(rig.Suggester.Calls);
+        Assert.True(call.Trigger.HasFlag(Trigger.Forced));
+        Assert.NotNull(call.RegionPng);
+    }
+
+    [AvaloniaFact]
+    public void Panic_without_a_text_area_asks_for_one_first()
+    {
+        using var rig = Rig.Make();
+        int asked = 0;
+        rig.PickRegion = () => { asked++; return Task.CompletedTask; };   // cancelled picker: no region
+        rig.Vm.PanicCommand.Execute(null);
+        Pump(() => asked == 1);
+        Thread.Sleep(150);
+        Assert.Empty(rig.Suggester.Calls);
+
+        rig.PickRegion = () => { asked++; rig.Engine.SetRegion(new Region(10, 10, 300, 100)); return Task.CompletedTask; };
+        rig.Vm.PanicCommand.Execute(null);
+        Pump(() => rig.Vm.Sections.Count > 0 && rig.Vm.IsListening);
+        Assert.Equal(2, asked);
+        Assert.True(Assert.Single(rig.Suggester.Calls).Trigger.HasFlag(Trigger.Forced));
+    }
+
+    [AvaloniaFact]
+    public void Regenerate_redoes_the_reply_and_takes_the_typed_direction()
+    {
+        using var rig = Rig.Make();
+        rig.Vm.SetListening();
+        Assert.False(rig.Vm.HasSections);                      // nothing to regenerate yet: button is hidden
+        rig.Engine.AddTurn(Speaker.Them, "Can you walk me through your last project please?");
+        Pump(() => rig.Vm.Sections.Count > 0 && rig.Vm.IsListening);
+        Shot(rig.Window, "main-regenerate-light");
+
+        rig.Vm.Hint = "shorter";
+        rig.Vm.RegenerateCommand.Execute(null);
+        Assert.Equal("", rig.Vm.Hint);
+        Pump(() => rig.Suggester.Calls.Count == 2 && rig.Vm.IsListening);
+        var redo = rig.Suggester.Calls[1];
+        Assert.Equal("shorter", redo.Hint);
+        Assert.NotNull(redo.Rejected);
+        Assert.Contains("Monday morning works", redo.Rejected![0]);
+        Assert.Equal(Trigger.Speech, redo.Trigger);
     }
 
     [AvaloniaFact]

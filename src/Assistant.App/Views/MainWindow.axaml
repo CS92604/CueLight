@@ -42,9 +42,16 @@
             </Button>
           </Grid>
         </Border>
-        <Grid ColumnDefinitions="Auto,*,Auto">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4">
           <ToggleSwitch IsChecked="{Binding AutoSuggest}" OnContent="Auto-suggest" OffContent="Auto-suggest" FontSize="12" />
-          <Button Grid.Column="2" Classes="ghost" Content="Clear chat" Command="{Binding ClearChatCommand}" />
+          <Button Grid.Column="2" Classes="panic" Command="{Binding PanicCommand}" VerticalAlignment="Center"
+                  ToolTip.Tip="Panic: re-read the text area right now and give me a reply">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Path Data="{StaticResource IconBolt}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" Width="14" Height="14" Stretch="Uniform" />
+              <TextBlock Text="Panic" Foreground="{Binding $parent[Button].Foreground}" />
+            </StackPanel>
+          </Button>
+          <Button Grid.Column="3" Classes="ghost" Content="Clear chat" Command="{Binding ClearChatCommand}" />
         </Grid>
       </StackPanel>
     </Border>
@@ -102,7 +109,16 @@
 
         <!-- Suggestions -->
         <StackPanel Spacing="12">
-          <TextBlock Classes="eyebrow" Text="SUGGESTIONS" Margin="4,4,0,0" />
+          <Grid ColumnDefinitions="*,Auto" Margin="4,4,0,0">
+            <TextBlock Classes="eyebrow" Text="SUGGESTIONS" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ghost" Command="{Binding RegenerateCommand}" IsVisible="{Binding HasSections}"
+                    ToolTip.Tip="Redo this reply with a different take. Type a direction below first, like “shorter”.">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Path Data="{StaticResource IconRefresh}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.9" StrokeLineCap="Round" StrokeJoin="Round" Width="13" Height="13" Stretch="Uniform" />
+                <TextBlock Text="Regenerate" Foreground="{Binding $parent[Button].Foreground}" />
+              </StackPanel>
+            </Button>
+          </Grid>
           <Border IsVisible="{Binding !HasSections}" Padding="4,6">
             <TextBlock Classes="title muted" FontStyle="Italic" FontSize="19" TextWrapping="Wrap" LineHeight="28" Foreground="{DynamicResource TextFaint}"
                        Text="Suggestions will appear here as people talk or your text area changes." />

@@ -128,7 +128,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 _raw = "";
                 Sections.Clear();
                 OnPropertyChanged(nameof(HasSections));
-                Set(StatusKind.Thinking, "Thinking…");
+                Set(StatusKind.Thinking, e.Text ?? "Thinking…");
                 break;
             case EngineEventKind.Chunk:
                 _raw += e.Text;
@@ -172,6 +172,27 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var hint = Hint.Trim();
         Hint = "";
         _engine.Request(Trigger.None, hint.Length > 0 ? hint : null);
+    }
+
+    /// <summary>Panic: re-read the text area right now and reply. Asks for an area first if there isn't one.</summary>
+    [RelayCommand]
+    private async Task Panic()
+    {
+        if (_engine.Region is null)
+        {
+            await _pickRegion();
+            if (_engine.Region is null) return; // picker cancelled
+        }
+        _engine.Panic();
+    }
+
+    /// <summary>Redo the current reply. Anything typed in the box becomes the new direction ("shorter", ...).</summary>
+    [RelayCommand]
+    private void Regenerate()
+    {
+        var hint = Hint.Trim();
+        Hint = "";
+        _engine.Regenerate(hint.Length > 0 ? hint : null);
     }
 
     [RelayCommand]

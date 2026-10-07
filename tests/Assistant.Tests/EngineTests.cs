@@ -261,4 +261,177 @@ public class EngineTests : IDisposable
         rec.WaitFor(EngineEventKind.SuggestEnd);
         Assert.Equal(Professionalism.Formal, sug.Calls[0].Settings.Professionalism);
     }
+
+    // -- Panic ------------------------------------------------------------------------------
+
+    [Fact]
+    public void Panic_reads_the_text_area_now_even_with_auto_suggest_off()
+    {
+        var (eng, sug, rec) = Make(o => { o.AutoSuggest = false; o.Debounce = TimeSpan.FromSeconds(30); }, withRegion: true);
+        Assert.True(eng.Panic());
+        rec.WaitFor(EngineEventKind.SuggestEnd, timeoutMs: 2000);
+        var call = Assert.Single(sug.Calls);
+        Assert.True(call.Trigger.HasFlag(Trigger.Forced));
+        Assert.NotNull(call.RegionPng);
+        Assert.Contains(rec.Events, e => e.Kind == EngineEventKind.SuggestStart && e.Text == "Reading the text area…");
+    }
+
+    [Fact]
+    public void Panic_does_not_wait_for_a_changing_screen_to_settle()
+    {
+        var (eng, sug, rec) = Make(o => o.MergeHold = TimeSpan.FromSeconds(5), withRegion: true);
+        FakeWatcher.Instances[^1].Pending = true;    // the chat is still mid-change
+        eng.Panic();
+        rec.WaitFor(EngineEventKind.SuggestEnd, timeoutMs: 1500);
+        Assert.Single(sug.Calls);
+    }
+
+    [Fact]
+    public void Panic_without_a_text_area_says_so_and_sends_nothing()
+    {
+        var (eng, sug, rec) = Make();
+        Assert.False(eng.Panic());
+        Thread.Sleep(150);
+        Assert.Empty(sug.Calls);
+        Assert.Contains(rec.Events, e => e.Kind == EngineEventKind.Status && e.Text!.Contains("text area"));
+    }
+
+    [Fact]
+    public void Panic_takes_over_a_reply_in_progress_and_keeps_what_it_owed()
+    {
+        var gate = new ManualResetEventSlim();
+        var (eng, sug, rec) = Make(o => o.Debounce = TimeSpan.Zero, new FakeSuggester { Gate = gate }, withRegion: true);
+        eng.AddTurn(Speaker.Them, "Hey, are you still there with us on the call?");
+        Assert.True(sug.FirstChunkSent.Wait(3000));
+        eng.Panic();
+        gate.Set();
+        rec.WaitFor(EngineEventKind.SuggestEnd, timeoutMs: 5000);
+        Thread.Sleep(200);
+        Assert.Equal(2, sug.Calls.Count);
+        Assert.Equal(Trigger.Speech | Trigger.Manual | Trigger.Forced, sug.Calls[1].Trigger);
+        Assert.NotNull(sug.Calls[1].RegionPng);
+    }
+
+    // -- Regenerate -------------------------------------------------------------------------
+
+    [Fact]
+    public void Regenerate_redoes_the_last_request_and_passes_the_thrown_away_reply()
+    {
+        var (eng, sug, rec) = Make(withRegion: true);
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");
+        rec.WaitFor(EngineEventKind.SuggestEnd, 1);
+        eng.Regenerate();
+        rec.WaitFor(EngineEventKind.SuggestEnd, 2);
+        Assert.Equal(2, sug.Calls.Count);
+        Assert.Null(sug.Calls[0].Rejected);
+        Assert.Equal(Trigger.Speech, sug.Calls[1].Trigger);
+        Assert.Null(sug.Calls[1].RegionPng);                      // a spoken-only request stays spoken-only
+        Assert.Equal(new[] { "SAY\n• one\n• two" }, sug.Calls[1].Rejected);
+        Assert.Contains(rec.Events, e => e.Kind == EngineEventKind.SuggestStart && e.Text == "Trying another take…");
+    }
+
+    [Fact]
+    public void Regenerating_again_remembers_every_reply_up_to_a_cap()
+    {
+        var (eng, sug, rec) = Make(o => o.AutoSuggest = false, withRegion: true);
+        eng.Request();
+        rec.WaitFor(EngineEventKind.SuggestEnd, 1);
+        for (int i = 2; i <= 6; i++)
+        {
+            eng.Regenerate();
+            rec.WaitFor(EngineEventKind.SuggestEnd, i);
+        }
+        Assert.Equal(new[] { 0, 1, 2, 3, 3, 3 }, sug.Calls.Select(c => c.Rejected?.Count ?? 0));
+    }
+
+    [Fact]
+    public void Regenerate_keeps_the_hint_until_given_a_new_one()
+    {
+        var (eng, sug, rec) = Make(o => o.AutoSuggest = false);
+        eng.Request(hint: "shorter");
+        rec.WaitFor(EngineEventKind.SuggestEnd, 1);
+        eng.Regenerate();
+        rec.WaitFor(EngineEventKind.SuggestEnd, 2);
+        eng.Regenerate("friendlier");
+        rec.WaitFor(EngineEventKind.SuggestEnd, 3);
+        Assert.Equal(new[] { "shorter", "shorter", "friendlier" }, sug.Calls.Select(c => c.Hint));
+    }
+
+    [Fact]
+    public void Regenerate_uses_the_current_transcript_and_settings()
+    {
+        var (eng, sug, rec) = Make(o => o.AutoSuggest = false);
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");
+        eng.Request();
+        rec.WaitFor(EngineEventKind.SuggestEnd, 1);
+        eng.AddTurn(Speaker.Me, "Sure, it was a booking system.");
+        eng.Settings = new Settings { Professionalism = Professionalism.Formal };
+        eng.Regenerate();
+        rec.WaitFor(EngineEventKind.SuggestEnd, 2);
+        Assert.Contains("booking system", sug.Calls[1].Transcript);
+        Assert.Equal(Professionalism.Formal, sug.Calls[1].Settings.Professionalism);
+    }
+
+    [Fact]
+    public void A_new_moment_forgets_the_thrown_away_replies()
+    {
+        var (eng, sug, rec) = Make(o => o.Debounce = TimeSpan.Zero);
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");
+        rec.WaitFor(EngineEventKind.SuggestEnd, 1);
+        eng.Regenerate();
+        rec.WaitFor(EngineEventKind.SuggestEnd, 2);
+        eng.AddTurn(Speaker.Them, "And what did you enjoy most about it?");
+        rec.WaitFor(EngineEventKind.SuggestEnd, 3);
+        Assert.NotNull(sug.Calls[1].Rejected);
+        Assert.Null(sug.Calls[2].Rejected);
+    }
+
+    [Fact]
+    public void Regenerating_midway_restarts_once_and_throws_away_the_partial_reply()
+    {
+        var gate = new ManualResetEventSlim();
+        var (eng, sug, rec) = Make(o => o.Debounce = TimeSpan.Zero, new FakeSuggester { Gate = gate });
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");
+        Assert.True(sug.FirstChunkSent.Wait(3000));
+        eng.Regenerate();
+        gate.Set();
+        rec.WaitFor(EngineEventKind.SuggestEnd, timeoutMs: 5000);
+        Thread.Sleep(300);
+        Assert.Equal(2, sug.Calls.Count);                         // no duplicate from the cancelled run's debt
+        Assert.Equal(new[] { "SAY\n• one" }, sug.Calls[1].Rejected);
+    }
+
+    [Fact]
+    public void Regenerate_with_nothing_to_redo_is_a_plain_manual_request()
+    {
+        var (eng, sug, rec) = Make(o => o.AutoSuggest = false);
+        eng.Regenerate();
+        rec.WaitFor(EngineEventKind.SuggestEnd);
+        Assert.Equal(Trigger.Manual, sug.Calls[0].Trigger);
+        Assert.Null(sug.Calls[0].Rejected);
+    }
+
+    [Fact]
+    public void A_nothing_to_respond_reply_is_not_held_against_the_next_try()
+    {
+        var (eng, sug, rec) = Make(o => o.AutoSuggest = false, new FakeSuggester { Chunks = new[] { "(nothing to respond to yet)" } });
+        eng.Request();
+        rec.WaitFor(EngineEventKind.SuggestEnd, 1);
+        eng.Regenerate();
+        rec.WaitFor(EngineEventKind.SuggestEnd, 2);
+        Assert.Null(sug.Calls[1].Rejected);
+    }
+
+    [Fact]
+    public void Clearing_the_conversation_forgets_what_there_was_to_regenerate()
+    {
+        var (eng, sug, rec) = Make(o => o.AutoSuggest = false, withRegion: true);
+        eng.Request(Trigger.Speech);
+        rec.WaitFor(EngineEventKind.SuggestEnd, 1);
+        eng.ClearConversation();
+        eng.Regenerate();
+        rec.WaitFor(EngineEventKind.SuggestEnd, 2);
+        Assert.Equal(Trigger.Manual, sug.Calls[1].Trigger);
+        Assert.Null(sug.Calls[1].Rejected);
+    }
 }

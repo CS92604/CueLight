@@ -19,6 +19,7 @@
           <SolidColorBrush x:Key="AccentPressed" Color="#BE5F40" />
           <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
           <SolidColorBrush x:Key="AccentSoft" Color="#F8E9E2" />
+          <SolidColorBrush x:Key="AccentSoftHover" Color="#F3DACE" />
           <SolidColorBrush x:Key="AccentText" Color="#B0502F" />
           <SolidColorBrush x:Key="InfoSoft" Color="#E8EEF4" />
           <SolidColorBrush x:Key="InfoText" Color="#3E5A78" />
@@ -40,6 +41,7 @@
           <SolidColorBrush x:Key="AccentPressed" Color="#C96A4B" />
           <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
           <SolidColorBrush x:Key="AccentSoft" Color="#4A3A33" />
+          <SolidColorBrush x:Key="AccentSoftHover" Color="#5A453C" />
           <SolidColorBrush x:Key="AccentText" Color="#EFA88C" />
           <SolidColorBrush x:Key="InfoSoft" Color="#34404D" />
           <SolidColorBrush x:Key="InfoText" Color="#A8C1DA" />
@@ -194,6 +196,26 @@
   </Style>
   <Style Selector="Button.ghost.done:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Foreground" Value="{DynamicResource Success}" />
+  </Style>
+
+  <!-- Panic: the one button to reach for in a hurry, so it carries the accent. -->
+  <Style Selector="Button.panic">
+    <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Padding" Value="12,6" />
+  </Style>
+  <Style Selector="Button.panic:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoftHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+  <Style Selector="Button.panic:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoftHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentPressed}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
   </Style>
 
   <Style Selector="Button.icon">
