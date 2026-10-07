@@ -73,6 +73,13 @@ public class TranscriptCleanerTests
     [InlineData("Hello there [music] how are you", "Hello there how are you")]
     [InlineData("  Can you start   Monday? ", "Can you start Monday?")]
     [InlineData("(laughs) That's funny.", "That's funny.")]
+    [InlineData("Thanks for watching!", "")]
+    [InlineData("Thank you for watching.", "")]
+    [InlineData("Subtitles by the Amara.org community", "")]
+    [InlineData("Please subscribe to my channel.", "")]
+    [InlineData("Thanks for watching! See you next time", "See you next time")]
+    [InlineData("Thank you.", "Thank you.")]            // could be said for real: kept
+    [InlineData("I'd subscribe to that view.", "I'd subscribe to that view.")]
     public void Cleans_annotations(string input, string expected) => Assert.Equal(expected, TranscriptCleaner.Clean(input));
 }
 

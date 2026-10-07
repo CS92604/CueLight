@@ -652,7 +652,7 @@ public class UiTests
         var panic = rig.Window.GetVisualDescendants().OfType<Button>().First(b => b.Classes.Contains("panic"));
         Assert.False(panic.IsEffectivelyEnabled);
         Assert.Contains("Recording is off", ToolTip.GetTip(panic) as string);
-        Assert.True(ToolTip.GetShowOnDisabled(rig.Window));
+        Assert.True(ToolTip.GetShowOnDisabled(panic), "disabled buttons must still show their hover text");
     }
 
     [AvaloniaFact]

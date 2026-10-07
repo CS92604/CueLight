@@ -234,9 +234,13 @@ public sealed class AppHost : IDisposable
         _saveTimer.Change(400, Timeout.Infinite); // debounce: typing in a field changes settings per keystroke
     }
 
+    private SettingsWindow? _settingsWindow;
+    private bool _picking;
+
     private void OpenSettings()
     {
         if (_window is null) return;
+        if (_settingsWindow is { } open) { open.Activate(); return; } // already open: don't stack a second one
         var entry = new KeyEntryViewModel();
         var vm = new SettingsViewModel(Settings, ApplySettings, entry, _apiKey, key =>
         {
@@ -244,7 +248,8 @@ public sealed class AppHost : IDisposable
         });
         var win = new SettingsWindow { DataContext = vm };
         KeyRemoved += CloseOnRemoved;
-        win.Closed += (_, _) => KeyRemoved -= CloseOnRemoved;
+        _settingsWindow = win;
+        win.Closed += (_, _) => { KeyRemoved -= CloseOnRemoved; _settingsWindow = null; };
         void CloseOnRemoved() => win.Close();
         win.Show(_window);
     }
@@ -253,7 +258,8 @@ public sealed class AppHost : IDisposable
 
     private async Task PickRegionAsync()
     {
-        if (_window is null) return;
+        if (_window is null || _picking) return; // a second click while the picker is open does nothing
+        _picking = true;
         try
         {
             var region = await RegionPicker.PickAsync(_window, Capture);
@@ -261,8 +267,10 @@ public sealed class AppHost : IDisposable
         }
         catch (Exception ex)
         {
+            AppLog.Error("The area picker failed", ex);
             _vm?.SetProblem($"Couldn't capture the screen: {ex.Message}");
         }
+        finally { _picking = false; }
     }
 
     private void ShowOutline(Region? region)

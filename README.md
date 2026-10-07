@@ -20,6 +20,12 @@ in words that sound like a person.
 Windows may show a "protected your PC" prompt because the app isn't code-signed yet:
 choose **More info → Run anyway**.
 
+**Runs on** 64-bit Windows 10 (1607 or later) and Windows 11 on Intel/AMD, with no installs:
+the zip carries the .NET runtime and the Visual C++ runtime. PCs without AVX2 (older or
+low-end processors) use a slower build of the speech engine automatically, and PCs with four or
+fewer processor cores start on the fastest speech model. ARM PCs run it through Windows'
+x64 emulation (I haven't tried one). Windows 7, 8 and 32-bit Windows aren't supported.
+
 <p align="center"><img src="docs/welcome-light.png" width="300" alt="Welcome screen with the API key field"></p>
 
 ## Using it
@@ -54,6 +60,9 @@ Then:
 - Type a direction in the box at the bottom (“shorter”, “ask about the timeline”) and press
   Enter for a fresh set. Turn **Auto-suggest** off to only get suggestions when you ask.
 - The pin keeps the window on top.
+- **Rest the mouse on any button, switch or option to see what it does.** In Settings every
+  choice (each Professionalism, Proficiency, Tone, Length… option, each model, each speech
+  accuracy) explains itself, and buttons that Recording-off disables say so.
 
 ### What Claude sees
 
@@ -113,6 +122,30 @@ ships in `src/Assistant.App/Assets/Fonts`). To use different fonts, change the t
   around someone who has asked you not to use AI help. It also means your own screenshots of the
   app come out blank.
 
+## If something doesn't work
+
+- **Log.** Problems are written to `%LOCALAPPDATA%\Claude Live Assistant\logs\app.log`: errors
+  and facts about the PC, never what was said, what was on screen, or your key.
+- **Check this PC.** `ClaudeLiveAssistant.exe --self-test --out C:\temp\check` tests the speech
+  engine (with real speech if you pass `--wav file.wav --expect word`), the sound devices, screen
+  capture, drawing the windows and hiding them from capture, and writes `self-test.txt` and
+  screenshots there. Add `--noavx` to test the build for CPUs without AVX2. The Windows build
+  runs exactly this on every push.
+- **Blank or missing window.** If a start doesn't finish, the next one draws with the CPU
+  instead of the graphics card (delete `software-rendering.flag` in the data folder to undo).
+  `--software-rendering` forces it.
+- **Speech model won't download** (blocked network): the status line says so and offers Retry.
+  Downloads resume where they stopped. To do it by hand, put `ggml-base.en.bin` (or `-tiny.en` /
+  `-small.en`) from [huggingface.co/ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp)
+  in `%LOCALAPPDATA%\Claude Live Assistant\models`.
+- **Sound.** The app follows your default speakers and headphones when you switch, retries after
+  an unplug or sleep, and says in the status line when no device is available or Windows is
+  blocking the microphone (Settings → Privacy & security → Microphone).
+- **Lock screen / UAC prompts.** Watching the text area pauses itself and carries on when the
+  screen is back.
+- **Behind a work proxy.** The app uses your Windows proxy settings and sign-in. Claude and
+  Hugging Face (first-run speech download) must be reachable.
+
 ## Build from source
 
 Needs the [.NET 8 SDK](https://dotnet.microsoft.com/download).
@@ -123,9 +156,11 @@ dotnet run --project src/Assistant.App        # run it (listening and text-area 
 dotnet publish src/Assistant.App -c Release -r win-x64 --self-contained -o publish
 ```
 
-The **Build** GitHub Actions workflow runs the tests and builds the Windows zip on every push.
-Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also publishes it as a
-[release](../../releases) with the zip and a SHA-256 file attached.
+The **Build** GitHub Actions workflow runs the tests (on Linux and on Windows), builds the
+Windows zip, checks that nothing in it needs a DLL a clean Windows PC lacks
+(`packaging/check-deps.py`), runs the self-test above on a real Windows machine, and uploads the
+result. Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also publishes it
+as a [release](../../releases) with the zip and a SHA-256 file attached.
 
 ## How it's put together
 
@@ -133,4 +168,4 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Assistant.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
 | `src/Assistant.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 106 core tests (including the real SDK against a local fake server) and 24 headless UI tests that render the windows and drive the area picker with simulated input. |
+| `tests/` | 130 core tests (including the real SDK against a local fake server) and 48 app tests: headless UI tests that render the windows, drive the area picker with simulated input and check every control has hover text, plus the model downloader, single-instance and start-up logic. |

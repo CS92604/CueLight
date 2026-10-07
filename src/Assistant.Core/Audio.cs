@@ -84,9 +84,14 @@ public static partial class TranscriptCleaner
     [GeneratedRegex(@"\s+")]
     private static partial Regex Spaces();
 
+    // Phrases Whisper invents out of near-silence and music (it was trained on video subtitles).
+    [GeneratedRegex(@"thank(s| you) for watching[.!]?|subtitles? by the amara\.org community|(please (like and )?|like and )subscribe( to (my|the|our) channel)?[.!]?|subscribe to (my|the|our) channel[.!]?|transcribed by [\w .]+?(?=[.!]|$)",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex Invented();
+
     public static string Clean(string text)
     {
-        var t = Spaces().Replace(Annotation().Replace(text, " "), " ").Trim();
+        var t = Spaces().Replace(Invented().Replace(Annotation().Replace(text, " "), " "), " ").Trim();
         // Only punctuation left (e.g. "..." or "-"): nothing was actually said.
         return t.Any(char.IsLetterOrDigit) ? t : "";
     }
