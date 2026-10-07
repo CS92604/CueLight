@@ -105,6 +105,73 @@ public class EngineTests : IDisposable
         Assert.Equal("SAY\n• one\n• two", string.Concat(rec.Events.Where(e => e.Kind == EngineEventKind.Chunk).Select(e => e.Text)));
     }
 
+    static FakeSuggester Nothing() => new() { Chunks = new[] { "(nothing to respond to yet)" } };
+
+    [Fact]
+    public void A_long_pause_after_nothing_to_reply_to_asks_again_once_with_the_pause_noted()
+    {
+        var (eng, sug, rec) = Make(o => o.PauseFollowUp = TimeSpan.FromMilliseconds(150), sug: Nothing(), withRegion: true);
+        eng.AddTurn(Speaker.Them, "The dog that played Toto in the Wizard of Oz was credited as");
+        rec.WaitFor(EngineEventKind.SuggestEnd, 2);
+
+        Assert.Equal(2, sug.Calls.Count);
+        Assert.Equal(Trigger.Speech, sug.Calls[0].Trigger);
+        Assert.Equal(Trigger.Pause, sug.Calls[1].Trigger);
+        Assert.Null(sug.Calls[1].RegionPng);                       // a pause is about what was said, not the screen
+        Assert.Contains("credited as", sug.Calls[1].Transcript);
+        Thread.Sleep(500);
+        Assert.Equal(2, sug.Calls.Count);                           // and only once: no loop of "still nothing"
+    }
+
+    [Fact]
+    public void No_second_look_if_there_was_something_to_reply_to()
+    {
+        var (eng, sug, rec) = Make(o => o.PauseFollowUp = TimeSpan.FromMilliseconds(100));
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");
+        rec.WaitFor(EngineEventKind.SuggestEnd);
+        Thread.Sleep(400);
+        Assert.Single(sug.Calls);
+    }
+
+    [Fact]
+    public void No_second_look_if_more_was_said_in_the_meantime()
+    {
+        var (eng, sug, rec) = Make(o => o.PauseFollowUp = TimeSpan.FromMilliseconds(300), sug: Nothing());
+        eng.AddTurn(Speaker.Them, "The dog that played Toto in the Wizard of Oz was credited as");
+        rec.WaitFor(EngineEventKind.SuggestEnd);
+        eng.AddTurn(Speaker.Them, "Toto, but in reality the dog's name was Terry.");     // the quiet did not go on
+        rec.WaitFor(EngineEventKind.SuggestEnd, 2);
+        Thread.Sleep(900);
+        // The first follow-up was dropped because speech came in; only the last turn's own follow-up fired.
+        Assert.Equal(1, sug.Calls.Count(c => c.Trigger == Trigger.Pause));
+        Assert.Contains("Terry", sug.Calls.Last(c => c.Trigger == Trigger.Pause).Transcript);
+    }
+
+    [Fact]
+    public void No_second_look_while_recording_is_off_or_someone_is_speaking_or_when_switched_off()
+    {
+        var (eng, sug, rec) = Make(o => o.PauseFollowUp = TimeSpan.FromMilliseconds(250), sug: Nothing());
+        eng.AddTurn(Speaker.Them, "The dog that played Toto in the Wizard of Oz was credited as");
+        rec.WaitFor(EngineEventKind.SuggestEnd);
+        eng.SetPaused(true);
+        Thread.Sleep(600);
+        Assert.DoesNotContain(sug.Calls, c => c.Trigger == Trigger.Pause);
+        eng.SetPaused(false);
+
+        var (eng2, sug2, rec2) = Make(o => o.PauseFollowUp = TimeSpan.FromMilliseconds(250), sug: Nothing());
+        eng2.AddTurn(Speaker.Them, "The dog that played Toto in the Wizard of Oz was credited as");
+        rec2.WaitFor(EngineEventKind.SuggestEnd);
+        eng2.SetSpeaking(Speaker.Them, true);                       // the next sentence has begun
+        Thread.Sleep(600);
+        Assert.DoesNotContain(sug2.Calls, c => c.Trigger == Trigger.Pause);
+
+        var (eng3, sug3, rec3) = Make(o => o.PauseFollowUp = Timeout.InfiniteTimeSpan, sug: Nothing());
+        eng3.AddTurn(Speaker.Them, "The dog that played Toto in the Wizard of Oz was credited as");
+        rec3.WaitFor(EngineEventKind.SuggestEnd);
+        Thread.Sleep(400);
+        Assert.Single(sug3.Calls);
+    }
+
     [Fact]
     public void What_each_request_used_is_added_up_and_announced()
     {

@@ -240,6 +240,26 @@ public class PromptTests
     }
 
     [Fact]
+    public void A_pause_is_the_users_turn_and_a_hanging_question_gets_an_answer()
+    {
+        Assert.Contains("a pause means it is the user's turn", Prompting.SystemPrompt);
+        Assert.Contains("a quiz or riddle", Prompting.SystemPrompt);
+        Assert.Contains("give the answer", Prompting.SystemPrompt);
+        // "nothing to respond to" is for when nothing is being waited for, not for anything left unfinished
+        Assert.Contains("Only if it is clear that nothing is being asked or waited for", Prompting.SystemPrompt);
+    }
+
+    [Fact]
+    public void A_long_pause_asks_for_the_answer_or_the_likely_ending()
+    {
+        var t = Text(Trigger.Pause);
+        Assert.Contains("<changed>spoken</changed>", t);
+        Assert.Contains("quiet for several seconds", t);
+        Assert.Contains("answer or the most likely way to finish it", t);
+        Assert.DoesNotContain("attached image", t);
+    }
+
+    [Fact]
     public void System_prompt_defines_the_sections_and_honesty_rules()
     {
         Assert.Contains("SAY", Prompting.SystemPrompt);

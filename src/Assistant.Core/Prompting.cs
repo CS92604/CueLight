@@ -3,9 +3,10 @@ using System.Text.RegularExpressions;
 
 namespace Assistant.Core;
 
-/// <summary>Which channel(s) triggered a request. <c>Forced</c> is the Panic button.</summary>
+/// <summary>Which channel(s) triggered a request. <c>Forced</c> is the Panic button; <c>Pause</c> is a follow-up sent
+/// after several quiet seconds, when the first look at what was said found nothing to reply to.</summary>
 [Flags]
-public enum Trigger { None = 0, Speech = 1, Text = 2, Manual = 4, Forced = 8 }
+public enum Trigger { None = 0, Speech = 1, Text = 2, Manual = 4, Forced = 8, Pause = 16 }
 
 public sealed record SuggestionRequest(
     string Transcript,
@@ -38,6 +39,8 @@ public static class Prompting
         - SAY: what the user should say out loud in reply to the spoken conversation.
         - TYPE: what the user should type in reply to the written text in the screen region. Treat the newest message not written by the user as the one that needs a reply.
 
+        Requests are sent when the other person pauses, and a pause means it is the user's turn. If their last words are a question, a quiz or riddle, or a sentence left hanging for the user to finish or answer, they are waiting for the user: give the answer, or the most likely way to finish the sentence, as the first option (say so inside the option if you aren't sure), then other angles. If a request says it has been quiet for several seconds, they are waiting for the user even more clearly: reply.
+
         The <changed> tag says which channel(s) have something new. Include a section only for a channel that has something to respond to. If both changed, give both and keep them consistent with each other. If the user pressed Suggest manually, include whichever channels have something to reply to. If they pressed Panic, they need a reply right now: read the image as it is at this moment and always answer it, plus SAY if the last spoken line needs an answer.
 
         If <rejected_suggestions> is present, those are earlier suggestions for this same moment that the user didn't want. Don't repeat them or lightly reword them; take a clearly different angle.
@@ -49,7 +52,7 @@ public static class Prompting
         TYPE
         • option
 
-        A section heading on its own line, then one option per line, each starting with "• ". Omit a section that isn't needed. If nothing needs a reply, output exactly: (nothing to respond to yet)
+        A section heading on its own line, then one option per line, each starting with "• ". Omit a section that isn't needed. Only if it is clear that nothing is being asked or waited for (they are plainly in the middle of something that has nothing to do with the user), output exactly: (nothing to respond to yet)
 
         Sounding human:
         - Write how people actually talk or type: contractions, plain words, natural rhythm, sentences of varying length.
@@ -111,7 +114,7 @@ public static class Prompting
     public static string TailText(SuggestionRequest r)
     {
         var changed = new List<string>();
-        if (r.Trigger.HasFlag(Trigger.Speech)) changed.Add("spoken");
+        if (r.Trigger.HasFlag(Trigger.Speech) || r.Trigger.HasFlag(Trigger.Pause)) changed.Add("spoken");
         if (r.Trigger.HasFlag(Trigger.Text)) changed.Add("written");
         if (changed.Count == 0)
         {
@@ -137,6 +140,8 @@ public static class Prompting
     {
         if (t.HasFlag(Trigger.Forced))
             return "I pressed the panic button because I need to reply right now. Read the attached region of my screen as it is at this moment, find the newest message not written by me, and give me what to TYPE. If the last thing said out loud also needs an answer, give me what to SAY too.";
+        if (t.HasFlag(Trigger.Pause) && !t.HasFlag(Trigger.Text))
+            return "It has been quiet for several seconds since they last spoke, so they are probably waiting for me. Give me what to SAY: if what they last said was a question, a riddle or a sentence left hanging, start with the answer or the most likely way to finish it.";
         t &= Trigger.Speech | Trigger.Text;
         return t switch
         {

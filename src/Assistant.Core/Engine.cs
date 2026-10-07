@@ -15,6 +15,13 @@ public sealed class EngineOptions
     /// <summary>Wait this long after the last trigger before asking Claude. Speech has already been cut at a pause
     /// and takes a moment to transcribe, so this only needs to merge triggers that arrive almost together.</summary>
     public TimeSpan Debounce { get; set; } = TimeSpan.FromMilliseconds(400);
+    /// <summary>
+    /// If Claude found nothing to reply to after the other person spoke, and then nobody says anything for this
+    /// long, ask once more, telling it the pause is long: they are probably waiting for an answer. (A quiz
+    /// question, or a sentence left hanging, can look like nothing to reply to until the silence goes on.)
+    /// <see cref="Timeout.InfiniteTimeSpan"/> turns this off.
+    /// </summary>
+    public TimeSpan PauseFollowUp { get; set; } = TimeSpan.FromSeconds(4);
     /// <summary>Max time to hold a spoken request while the watched text is still changing.</summary>
     public TimeSpan MergeHold { get; set; } = TimeSpan.FromSeconds(3);
     /// <summary>
@@ -62,6 +69,7 @@ public sealed class Engine : IDisposable
     private Trigger _lastKinds;     // what the most recent run was asked, for Regenerate
     private string? _lastHint;
     private string _lastReply = "";
+    private int _turnSeq;           // counts turns added, so a follow-up can tell whether anything was said since
     private readonly List<string> _rejected = new();   // replies the user has regenerated away
     private double? _deadline;      // seconds on _clock
     private double _queuedAt;
@@ -213,6 +221,7 @@ public sealed class Engine : IDisposable
         text = text.Trim();
         if (text.Length == 0) return;
         Conversation.Add(speaker, text);
+        Interlocked.Increment(ref _turnSeq);
         Emit(new EngineEvent(EngineEventKind.Turn, text, speaker));
         if (speaker == Speaker.Them && Options.AutoSuggest
             && text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length >= Options.AutoMinWords)
@@ -376,7 +385,7 @@ public sealed class Engine : IDisposable
         Emit(new EngineEvent(EngineEventKind.SuggestStart, redo ? "Trying another take…"
             : kinds.HasFlag(Trigger.Forced) ? "Reading the text area…" : null));
         byte[]? png = null;
-        if (Region is { } region && TextEnabled && kinds != Trigger.Speech)
+        if (Region is { } region && TextEnabled && (kinds & ~(Trigger.Speech | Trigger.Pause)) != Trigger.None)
         {
             // Spoken-only triggers skip the image; any other trigger includes what's on screen now.
             try { png = _capture.CapturePng(region); }
@@ -397,6 +406,8 @@ public sealed class Engine : IDisposable
             },
         };
         var reply = new System.Text.StringBuilder();
+        bool failed = false;
+        int seq = Volatile.Read(ref _turnSeq);
         try
         {
             await foreach (var chunk in _suggester.StreamAsync(request, ct))
@@ -426,9 +437,33 @@ public sealed class Engine : IDisposable
         }
         catch (Exception ex)
         {
+            failed = true;
             Emit(new EngineEvent(EngineEventKind.Error, ClaudeSuggester.Describe(ex)));
         }
         Emit(new EngineEvent(EngineEventKind.SuggestEnd));
+
+        // Spoken words that Claude saw nothing to answer: if the quiet goes on, look again with that in mind.
+        if (!failed && kinds.HasFlag(Trigger.Speech) && !kinds.HasFlag(Trigger.Pause)
+            && reply.ToString().TrimStart().StartsWith("(nothing", StringComparison.OrdinalIgnoreCase))
+            ScheduleFollowUp(seq, epoch);
+    }
+
+    private void ScheduleFollowUp(int seq, int epoch)
+    {
+        var wait = Options.PauseFollowUp;
+        if (wait <= TimeSpan.Zero || wait == Timeout.InfiniteTimeSpan) return;
+        _ = Task.Run(async () =>
+        {
+            try { await Task.Delay(wait, _stop.Token); }
+            catch (OperationCanceledException) { return; }
+            lock (_gate)
+            {
+                // Only if the quiet really went on: nothing was said or cleared since, nobody is speaking now,
+                // recording is still on, and no other request is already waiting.
+                if (Paused || epoch != _clearEpoch || seq != Volatile.Read(ref _turnSeq) || _speaking.Count > 0 || _deadline is not null) return;
+            }
+            Request(Trigger.Pause);
+        });
     }
 
     public void Dispose()
