@@ -14,6 +14,22 @@ public sealed class Segmenter
     private readonly List<float[]> _active = new();
     private float _noise;
     private int _speech, _silence;
+    private bool _wasSpeaking;
+
+    /// <summary>True once enough speech has been heard to be worth transcribing (a click or a cough shorter than
+    /// that never counts), until the pause that ends it. A short pause between words doesn't end it.</summary>
+    public bool IsSpeaking => _active.Count > 0 && _speech >= _minSpeechFrames;
+
+    /// <summary>Raised when <see cref="IsSpeaking"/> changes. Runs on the thread that feeds the segmenter.</summary>
+    public event Action<bool>? SpeakingChanged;
+
+    private void NotifySpeaking()
+    {
+        bool now = IsSpeaking;
+        if (now == _wasSpeaking) return;
+        _wasSpeaking = now;
+        SpeakingChanged?.Invoke(now);
+    }
 
     public Segmenter(int sampleRate = 16000, int frameMs = 30, int silenceMs = 700, int minSpeechMs = 300,
         double maxUtteranceS = 25, int prerollMs = 240, float minRms = 0.008f, float noiseFactor = 3f)
@@ -48,6 +64,7 @@ public sealed class Segmenter
         float[]? utt = null;
         if (_active.Count > 0 && _speech >= _minSpeechFrames) utt = Concat(_active);
         Reset();
+        NotifySpeaking();
         return utt;
     }
 
@@ -58,6 +75,13 @@ public sealed class Segmenter
     }
 
     private float[]? Step(float[] frame)
+    {
+        var utterance = StepCore(frame);
+        NotifySpeaking();
+        return utterance;
+    }
+
+    private float[]? StepCore(float[] frame)
     {
         double sum = 0;
         foreach (var s in frame) sum += s * s;

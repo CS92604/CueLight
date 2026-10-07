@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace Assistant.Core;
 
-public enum EngineEventKind { Turn, SuggestStart, Chunk, SuggestEnd, Status, Error, RegionChanged, ModeChanged, Recovered, Usage }
+public enum EngineEventKind { Turn, SuggestStart, Chunk, SuggestEnd, Status, Error, RegionChanged, ModeChanged, Recovered, Usage, Hearing }
 
 public sealed record EngineEvent(
     EngineEventKind Kind, string? Text = null, Speaker? Speaker = null, Region? Region = null);
@@ -12,8 +12,9 @@ public sealed class EngineOptions
     public bool AutoSuggest { get; set; } = true;
     /// <summary>Ignore short backchannels ("mm-hmm", "okay") for automatic suggestions.</summary>
     public int AutoMinWords { get; set; } = 4;
-    /// <summary>Wait this long after the last trigger before asking Claude.</summary>
-    public TimeSpan Debounce { get; set; } = TimeSpan.FromSeconds(1);
+    /// <summary>Wait this long after the last trigger before asking Claude. Speech has already been cut at a pause
+    /// and takes a moment to transcribe, so this only needs to merge triggers that arrive almost together.</summary>
+    public TimeSpan Debounce { get; set; } = TimeSpan.FromMilliseconds(400);
     /// <summary>Max time to hold a spoken request while the watched text is still changing.</summary>
     public TimeSpan MergeHold { get; set; } = TimeSpan.FromSeconds(3);
     /// <summary>
@@ -100,6 +101,24 @@ public sealed class Engine : IDisposable
     /// <summary>TYPE is on: the selected region is watched and included in requests.</summary>
     public bool TextEnabled { get; private set; } = true;
 
+    private readonly HashSet<Speaker> _speaking = new();
+
+    /// <summary>Someone is speaking right now (on the speakers, or into the microphone if it is on).</summary>
+    public bool IsHearingSpeech { get { lock (_gate) return !Paused && _speaking.Count > 0; } }
+
+    /// <summary>Called by the audio side when a person starts or stops speaking.</summary>
+    public void SetSpeaking(Speaker who, bool speaking)
+    {
+        bool before, after;
+        lock (_gate)
+        {
+            before = !Paused && _speaking.Count > 0;
+            if (speaking) _speaking.Add(who); else _speaking.Remove(who);
+            after = !Paused && _speaking.Count > 0;
+        }
+        if (before != after) Emit(new EngineEvent(EngineEventKind.Hearing, Speaker: who));
+    }
+
     /// <summary>True while the screen region is actually being polled.</summary>
     public bool IsWatching => Region is not null && TextEnabled && !Paused;
 
@@ -129,6 +148,7 @@ public sealed class Engine : IDisposable
             Paused = paused;
             if (paused)
             {
+                _speaking.Clear();
                 _clearEpoch++;                    // the cancelled run must not hand its debt to the next one
                 _runCts?.Cancel();
                 _deadline = null;
@@ -139,6 +159,7 @@ public sealed class Engine : IDisposable
         }
         ReconcileWatcher();
         Emit(new EngineEvent(EngineEventKind.ModeChanged));
+        Emit(new EngineEvent(EngineEventKind.Hearing)); // the "listening" display follows recording
     }
 
     /// <summary>TYPE on/off. Off ignores the region entirely; the region itself is kept for when it's switched back on.</summary>

@@ -267,7 +267,7 @@ public class UiTests
         rig.Engine.AddTurn(Speaker.Them, "Hey, can you start on Monday morning at nine?");
         Pump(() => rig.Vm.Sections.Count == 2 && rig.Vm.IsListening);
         Assert.True(rig.Vm.IsRecording);
-        Assert.Equal("Listening", rig.Vm.StatusLine);
+        Assert.Equal("Waiting for speech", rig.Vm.StatusLine);
 
         rig.Vm.IsRecording = false;
         Assert.True(rig.Engine.Paused);
@@ -294,7 +294,7 @@ public class UiTests
         Assert.False(rig.Engine.Paused);
         Assert.True(rig.Engine.IsWatching);
         Assert.Equal(new[] { false, true }, rig.Recording);
-        Assert.Equal("Listening", rig.Vm.StatusLine);
+        Assert.Equal("Waiting for speech", rig.Vm.StatusLine);
         Assert.True(rig.Vm.IsListening);
     }
 
@@ -666,23 +666,30 @@ public class UiTests
         var win = new SettingsWindow { DataContext = vm, Width = 480, Height = 760 };
         win.Show();
         Settle();
-        // Lists only create the rows that are on screen, so look at the top of the page and then the bottom.
-        var items = win.GetVisualDescendants().OfType<ListBoxItem>().ToList();
+        // Lists only create the rows that are on screen (and recycle the others), so check the rows at the top of the
+        // page, then scroll and check the ones that appear.
+        var tips = new List<(object Option, string Tip)>();
+        void CheckVisibleRows()
+        {
+            foreach (var item in win.GetVisualDescendants().OfType<ListBoxItem>().ToList())
+            {
+                var tip = TipFor(item);
+                Assert.False(string.IsNullOrWhiteSpace(tip), $"option '{item.DataContext}' has no hover text");
+                if (item.DataContext is { } option && !tips.Any(t => ReferenceEquals(t.Option, option))) tips.Add((option, tip!));
+            }
+        }
+        CheckVisibleRows();
         win.FindControl<ScrollViewer>("Scroller")!.ScrollToEnd();
         Settle();
-        items.AddRange(win.GetVisualDescendants().OfType<ListBoxItem>().Where(i => !items.Contains(i)));
-        Assert.True(items.Count >= 4 + 4 + 5 + 3 + 3 + 3 + 3, $"found {items.Count} options"); // professionalism, proficiency, tone, length, options, models, speech
-        foreach (var item in items)
-            Assert.False(string.IsNullOrWhiteSpace(TipFor(item)), $"option '{item.DataContext}' has no hover text");
+        CheckVisibleRows();
+        Assert.True(tips.Count >= 4 + 4 + 5 + 3 + 3 + 3 + 3, $"found {tips.Count} options"); // professionalism, proficiency, tone, length, options, models, speech
         foreach (var sw in win.GetVisualDescendants().OfType<ToggleSwitch>())
             Assert.False(string.IsNullOrWhiteSpace(TipFor(sw)), "a switch has no hover text");
         foreach (var box in win.GetVisualDescendants().OfType<TextBox>().Where(t => t.IsEffectivelyVisible))
             Assert.False(string.IsNullOrWhiteSpace(TipFor(box)), "a text field has no hover text");
         // each segment explains itself specifically, not just its group
-        var formal = items.First(i => i.DataContext is ChoiceItem { Label: "Formal" });
-        Assert.Contains("senior", ToolTip.GetTip(formal) as string);
-        var accurate = items.First(i => i.DataContext is SpeechChoice { Value: SpeechAccuracy.Accurate });
-        Assert.Contains("fast PC", ToolTip.GetTip(accurate) as string);
+        Assert.Contains("senior", tips.First(t => t.Option is ChoiceItem { Label: "Formal" }).Tip);
+        Assert.Contains("fast PC", tips.First(t => t.Option is SpeechChoice { Value: SpeechAccuracy.Accurate }).Tip);
         win.Close();
     }
 
@@ -728,6 +735,65 @@ public class UiTests
         Assert.Equal("≈ $12.50+", MainViewModel.CostLabel(Cost(12.5m, unpriced: true)));
         Assert.Contains("1 request.", MainViewModel.CostTipFor(Cost(0.1m, requests: 1)));
         Assert.Contains("3 requests.", MainViewModel.CostTipFor(Cost(0.1m, requests: 3)));
+    }
+
+    [AvaloniaFact]
+    public void The_status_says_LISTENING_while_someone_is_speaking()
+    {
+        using var rig = Rig.Make();
+        rig.Vm.SetListening();
+        Assert.Equal("Waiting for speech", rig.Vm.StatusLine);
+        Assert.False(rig.Vm.ShowHearing);
+
+        rig.Engine.SetSpeaking(Speaker.Them, true);
+        Pump(() => rig.Vm.StatusLine == "LISTENING");
+        Settle();
+        var label = rig.Window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "LISTENING");
+        Assert.Contains("hearing", label.Classes);
+        Assert.Equal(Avalonia.Media.FontWeight.Bold, label.FontWeight);
+        var dot = rig.Window.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().First(e => e.Classes.Contains("dot"));
+        Assert.Contains("hearing", dot.Classes);
+        Shot(rig.Window, "main-listening-light");
+
+        rig.Engine.SetSpeaking(Speaker.Them, false);
+        Pump(() => rig.Vm.StatusLine == "Waiting for speech");
+        Assert.DoesNotContain("hearing", dot.Classes);
+    }
+
+    [AvaloniaFact]
+    public void LISTENING_does_not_hide_a_problem_or_the_recording_switch()
+    {
+        using var rig = Rig.Make();
+        rig.Vm.SetProblem("Lost the audio output device. Reconnecting as soon as it's back.");
+        rig.Engine.SetSpeaking(Speaker.Them, true);
+        Pump(() => rig.Vm.IsHearing);
+        Assert.Equal("Lost the audio output device. Reconnecting as soon as it's back.", rig.Vm.StatusLine);   // problems still win
+
+        rig.Vm.SetListening();
+        Assert.Equal("LISTENING", rig.Vm.StatusLine);
+        rig.Vm.IsRecording = false;                                  // recording off: nothing is heard
+        Assert.Equal(MainViewModel.PausedText, rig.Vm.StatusLine);
+        Pump(() => !rig.Vm.IsHearing);
+        rig.Vm.IsRecording = true;
+        Assert.Equal("Waiting for speech", rig.Vm.StatusLine);
+    }
+
+    [AvaloniaFact]
+    public void LISTENING_shows_over_Thinking_and_Thinking_comes_back_after()
+    {
+        using var rig = Rig.Make();
+        rig.Vm.SetListening();
+        rig.Suggester.HoldAfterFirstChunk = new ManualResetEventSlim(false);
+        rig.Engine.AddTurn(Speaker.Them, "Hey, can you start on Monday morning at nine?");
+        Pump(() => rig.Vm.Status == StatusKind.Thinking);
+        Assert.Equal("Thinking…", rig.Vm.StatusLine);
+
+        rig.Engine.SetSpeaking(Speaker.Them, true);
+        Pump(() => rig.Vm.StatusLine == "LISTENING");
+        rig.Engine.SetSpeaking(Speaker.Them, false);
+        Pump(() => rig.Vm.StatusLine == "Thinking…");
+        rig.Suggester.HoldAfterFirstChunk.Set();
+        Pump(() => rig.Vm.IsListening);
     }
 
     [AvaloniaFact]

@@ -105,6 +105,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public int OptionsIndex { get => _s.Options - 1; set { if (value < 0) return; _s.Options = value + 1; Changed(nameof(OptionsIndex)); } }
     public string ReplyLanguage { get => _s.ReplyLanguage; set { _s.ReplyLanguage = value ?? ""; Changed(nameof(ReplyLanguage)); } }
     public string CustomInstructions { get => _s.CustomInstructions; set { _s.CustomInstructions = value ?? ""; Changed(nameof(CustomInstructions)); } }
+    public bool ThinkFirst { get => _s.ThinkFirst; set { _s.ThinkFirst = value; Changed(nameof(ThinkFirst)); } }
     public bool UseMicrophone { get => _s.UseMicrophone; set { _s.UseMicrophone = value; Changed(nameof(UseMicrophone)); } }
 
     /// <summary>Whether this PC can keep windows out of screen capture (Windows 10 version 2004+).</summary>

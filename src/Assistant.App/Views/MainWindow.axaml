@@ -96,8 +96,8 @@
         <!-- Status -->
         <StackPanel Spacing="8" Margin="4,0,4,0">
           <Grid ColumnDefinitions="Auto,*,Auto">
-            <Ellipse Classes="dot" Classes.listening="{Binding IsListening}" Classes.busy="{Binding IsThinking}" Classes.error="{Binding IsError}" VerticalAlignment="Top" Margin="0,5,9,0" />
-            <TextBlock Grid.Column="1" Text="{Binding StatusLine}" Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" LineHeight="18" />
+            <Ellipse Classes="dot" Classes.listening="{Binding IsListening}" Classes.busy="{Binding IsThinking}" Classes.error="{Binding IsError}" Classes.hearing="{Binding ShowHearing}" VerticalAlignment="Top" Margin="0,5,9,0" />
+            <TextBlock Grid.Column="1" Text="{Binding StatusLine}" Classes="muted" Classes.hearing="{Binding ShowHearing}" TextWrapping="Wrap" VerticalAlignment="Center" LineHeight="18" />
             <Button Grid.Column="2" Classes="ghost" Content="Retry" Command="{Binding RetrySpeechCommand}" IsVisible="{Binding RetryVisible}" Padding="10,3" Margin="9,0,-10,0" VerticalAlignment="Center"
                     ToolTip.Tip="Try setting up speech recognition again." />
           </Grid>

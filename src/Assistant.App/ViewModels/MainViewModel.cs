@@ -24,6 +24,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private string _raw = "";
 
     public const string PausedText = "Recording is off. Nothing is being heard, watched or sent.";
+    public const string HearingText = "LISTENING";
+    public const string WaitingText = "Waiting for speech";
 
     public MainViewModel(Engine engine, Settings settings, Func<string, Task> copy, Func<Task> pickRegion,
         Action openSettings, Action settingsChanged, Action retrySpeech, Action<bool>? recordingChanged = null)
@@ -62,6 +64,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _pinOnTop;
     [ObservableProperty] private bool _isRecording = true;
     [ObservableProperty] private bool _typeEnabled;
+    [ObservableProperty] private bool _isHearing;
     [ObservableProperty] private string _costText = "$0.00";
     [ObservableProperty] private string _costTip = CostTipFor(new UsageSnapshot(0, 0, 0, 0, 0, 0m, false));
 
@@ -74,7 +77,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     // What the status area shows. While recording is off it says so and goes quiet, whatever the
     // speech model or Claude last reported; that comes back when recording does.
-    public string StatusLine => IsRecording ? StatusText : PausedText;
+    public string StatusLine => !IsRecording ? PausedText : ShowHearing ? HearingText : StatusText;
+
+    /// <summary>Someone is speaking right now, so the status says LISTENING. Problems and set-up messages still win.</summary>
+    public bool ShowHearing => IsRecording && IsHearing && (Status == StatusKind.Listening || Status == StatusKind.Thinking);
     public bool IsListening => IsRecording && Status == StatusKind.Listening;
     public bool IsThinking => IsRecording && (Status == StatusKind.Thinking || Status == StatusKind.Preparing);
     public bool IsError => IsRecording && Status == StatusKind.Error;
@@ -100,6 +106,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(PanicTip));
         OnPropertyChanged(nameof(RegenerateTip));
         OnPropertyChanged(nameof(StatusLine));
+        OnPropertyChanged(nameof(ShowHearing));
         OnPropertyChanged(nameof(IsListening));
         OnPropertyChanged(nameof(IsThinking));
         OnPropertyChanged(nameof(IsError));
@@ -109,6 +116,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnStatusChanged(StatusKind value) => RaiseStatusProperties();
     partial void OnStatusTextChanged(string value) => OnPropertyChanged(nameof(StatusLine));
+    partial void OnIsHearingChanged(bool value) => RaiseStatusProperties();
     partial void OnShowProgressChanged(bool value) => OnPropertyChanged(nameof(ProgressVisible));
     partial void OnCanRetryChanged(bool value) => OnPropertyChanged(nameof(RetryVisible));
 
@@ -153,7 +161,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         ShowProgress = false;
         CanRetry = false;
-        Set(StatusKind.Listening, _engine.Options.AutoSuggest ? "Listening" : "Listening · suggestions on request");
+        Set(StatusKind.Listening, _engine.Options.AutoSuggest ? WaitingText : WaitingText + " · suggestions on request");
     }
 
     public void SetPreparing(string text, double? progress)
@@ -213,6 +221,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             case EngineEventKind.Recovered:
                 // Whatever reported this problem works again (a device came back, the screen unlocked).
                 if (Status == StatusKind.Error && StatusText == e.Text) SetListening();
+                break;
+            case EngineEventKind.Hearing:
+                IsHearing = _engine.IsHearingSpeech;
                 break;
             case EngineEventKind.Usage:
                 var usage = _engine.Usage.Snapshot();

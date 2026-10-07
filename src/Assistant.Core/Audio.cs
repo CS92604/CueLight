@@ -11,6 +11,10 @@ public interface IAudioSource : IDisposable
     /// <summary>The device works again after a <see cref="Failed"/> (it was unplugged, the PC slept, ...).</summary>
     event Action? Recovered { add { } remove { } }
 
+    /// <summary>Someone started (true) or stopped (false) speaking on this device. Optional: a source that
+    /// can't tell just never raises it.</summary>
+    event Action<bool>? Speaking { add { } remove { } }
+
     void Start();
 }
 
@@ -33,8 +37,12 @@ public sealed class AudioIngest
     private readonly object _lock = new();
     private double _lastData;
 
+    /// <summary>Speech started (true) or ended (false) on this device.</summary>
+    public event Action<bool>? SpeakingChanged;
+
     public AudioIngest(int sampleRate, int channels, Action<float[]> onUtterance, Func<double>? clock = null)
     {
+        _segmenter.SpeakingChanged += on => SpeakingChanged?.Invoke(on);
         _resampler = new StreamResampler(sampleRate, channels);
         _onUtterance = onUtterance;
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -145,6 +153,7 @@ public sealed class AudioPipeline : IDisposable
     {
         string? lastFailure = null;
         source.Utterance += audio => _queue.Writer.TryWrite((who, audio));
+        source.Speaking += on => _engine.SetSpeaking(who, on);
         source.Failed += msg => { lastFailure = msg; _engine.RaiseError(msg); };
         source.Recovered += () => { if (lastFailure is { } failed) _engine.RaiseRecovered(failed); lastFailure = null; };
         lock (_sources) _sources.Add(source);

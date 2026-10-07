@@ -25,6 +25,9 @@ public sealed class Settings
     public string CustomInstructions { get; set; } = "";
 
     public string Model { get; set; } = Models.Default;
+    /// <summary>Let Claude think before it replies: slower to start, better on hard questions. Off by default,
+    /// because in a live conversation the first words of a reply matter more.</summary>
+    public bool ThinkFirst { get; set; }
     public bool UseMicrophone { get; set; }
     public bool AutoSuggest { get; set; } = true;
     public bool AlwaysOnTop { get; set; } = true;

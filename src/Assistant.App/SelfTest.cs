@@ -255,6 +255,65 @@ internal static class SelfTest
                 finally { RegionPicker.WindowsShown = null; }
             });
 
+            // The outline around the watched area: exactly 3 pixels thick, outside the box, and never over the text
+            // inside it. (It used to be drawn with tiny ordinary windows, which Windows enlarged to about 32 × 38.)
+            await Check("region outline", async () =>
+            {
+                var area = new Region(600, 200, 300, 160);   // clear of the app's own windows on a 1024-pixel-wide screen
+                const int margin = 12;
+                var outline = new RegionOutline();
+                try
+                {
+                    outline.Show(area);
+                    await Task.Delay(500);
+                    var (bgra, w, h) = new GdiScreenCapture().GrabBgra(new Region(area.Left - margin, area.Top - margin, area.Width + 2 * margin, area.Height + 2 * margin));
+                    bool Orange(int x, int y)
+                    {
+                        int i = (y * w + x) * 4;
+                        return Math.Abs(bgra[i] - 0x57) <= 6 && Math.Abs(bgra[i + 1] - 0x77) <= 6 && Math.Abs(bgra[i + 2] - 0xD9) <= 6;
+                    }
+                    int midX = margin + area.Width / 2, midY = margin + area.Height / 2;
+                    int right = margin + area.Width, bottom = margin + area.Height;
+                    var problems = new List<string>();
+                    void Expect(bool want, string what, int x, int y) { if (Orange(x, y) != want) problems.Add($"{what} at ({x},{y}) should {(want ? "" : "not ")}be orange"); }
+                    for (int d = 1; d <= RegionOutline.Thickness; d++)
+                    {
+                        Expect(true, "left bar", margin - d, midY);
+                        Expect(true, "top bar", midX, margin - d);
+                        Expect(true, "right bar", right + d - 1, midY);
+                        Expect(true, "bottom bar", midX, bottom + d - 1);
+                    }
+                    Expect(false, "the area's first column", margin, midY);
+                    Expect(false, "the area's first row", midX, margin);
+                    Expect(false, "the area's top-left corner", margin, margin);
+                    Expect(false, "a point 8 pixels inside", margin + 8, margin + 8);
+                    Expect(false, "just past the left bar", margin - RegionOutline.Thickness - 1, midY);
+                    Expect(false, "just past the top bar", midX, margin - RegionOutline.Thickness - 1);
+                    if (problems.Count > 0) throw new InvalidOperationException("the outline is wrong: " + string.Join("; ", problems));
+                    Line("ok    the outline is 3 pixels thick, outside the area, and leaves the area itself clear");
+
+                    if (CaptureShield.IsSupported)
+                    {
+                        outline.Hide();
+                        CaptureShield.SetHidden(true);
+                        outline.Show(area);
+                        foreach (var hwnd in outline.Handles)
+                            if (!GetWindowDisplayAffinity(hwnd, out var affinity) || affinity != 0x11)
+                                throw new InvalidOperationException($"an outline bar's capture affinity is {affinity:X}, expected 11");
+                        Line("ok    the outline is hidden from screen capture too");
+                    }
+                }
+                finally
+                {
+                    outline.Hide();
+                    CaptureShield.SetHidden(false);
+                }
+                await Task.Delay(300);
+                var after = new GdiScreenCapture().GrabBgra(new Region(area.Left - RegionOutline.Thickness, area.Top + area.Height / 2, RegionOutline.Thickness, 1));
+                if (after.Bgra[0] == 0x57 && after.Bgra[1] == 0x77 && after.Bgra[2] == 0xD9) throw new InvalidOperationException("the outline is still on screen after Hide");
+                Line("ok    the outline goes away when hidden");
+            });
+
             // Settings.
             var entry = new KeyEntryViewModel();
             var win = new SettingsWindow { DataContext = new SettingsViewModel(settings, () => { }, entry, "sk-ant-api03-abcdef1234", _ => { }) };

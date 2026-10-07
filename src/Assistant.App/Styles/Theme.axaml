@@ -470,6 +470,23 @@
     </Style.Animations>
   </Style>
 
+  <!-- Someone is speaking right now: the dot pulses green and the status reads LISTENING -->
+  <Style Selector="Ellipse.dot.hearing">
+    <Setter Property="Fill" Value="{DynamicResource Success}" />
+    <Style.Animations>
+      <Animation Duration="0:0:0.8" IterationCount="Infinite" Easing="SineEaseInOut">
+        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+        <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+  <Style Selector="TextBlock.muted.hearing">
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LetterSpacing" Value="1.2" />
+    <Setter Property="Foreground" Value="{DynamicResource Success}" />
+  </Style>
+
   <!-- Thin progress bar -->
   <Style Selector="ProgressBar.thin">
     <Setter Property="MinHeight" Value="4" />

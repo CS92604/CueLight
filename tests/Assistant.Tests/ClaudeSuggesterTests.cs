@@ -17,6 +17,7 @@ public sealed class FakeClaudeServer : IDisposable
     public string[] Deltas = { "SAY\n• Sure, ", "sounds good.\nTYPE\n• Works for me!" };
     // What the "API" reports having used: input / cache written / cache read tokens at the start, output tokens at the end.
     public int InputTokens = 10, CacheWritten, CacheRead, OutputTokens = 12;
+    public bool RefuseThinkingSetting;   // answer 400 to any request that carries a "thinking" setting
 
     public FakeClaudeServer()
     {
@@ -39,6 +40,14 @@ public sealed class FakeClaudeServer : IDisposable
             var headers = ctx.Request.Headers.AllKeys.ToDictionary(k => k!.ToLowerInvariant(), k => ctx.Request.Headers[k]!);
             lock (Requests) Requests.Add((ctx.Request.Url!.PathAndQuery, raw.Length > 0 ? JsonDocument.Parse(raw).RootElement.Clone() : default, headers));
 
+            if (RefuseThinkingSetting && raw.Contains("\"thinking\""))
+            {
+                ctx.Response.StatusCode = 400;
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes("{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"thinking.type: not supported\"}}"));
+                ctx.Response.Close();
+                continue;
+            }
             if (Status != 200)
             {
                 ctx.Response.StatusCode = Status;

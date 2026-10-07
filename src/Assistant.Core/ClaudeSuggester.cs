@@ -77,29 +77,47 @@ public sealed class ClaudeSuggester : ISuggester
         }
         content.Add(new BetaTextBlockParam { Text = Prompting.TailText(request) });
 
-        var p = new MessageCreateParams
+        var system = new List<BetaTextBlockParam>
         {
-            Model = model,
-            MaxTokens = _maxTokens,
-            System = new List<BetaTextBlockParam>
-            {
-                new() { Text = Prompting.SystemPrompt, CacheControl = new BetaCacheControlEphemeral() },
-            },
-            Messages = [new BetaMessageParam { Role = Role.User, Content = content }],
+            new() { Text = Prompting.SystemPrompt, CacheControl = new BetaCacheControlEphemeral() },
         };
-        // `effort` is not accepted by Haiku 4.5 (Haiku 5.5 and the other models take it).
-        if (!model.StartsWith("claude-haiku-4", StringComparison.Ordinal))
-            p = p with { OutputConfig = new BetaOutputConfig { Effort = Effort.Low } };
-        if (FallbackModels.Contains(model))
-            // If the safety classifiers decline, the API re-runs the request on a fallback model.
-            p = p with { Betas = [FallbackBeta], Fallbacks = new BetaFallbacksParam(new Default()) };
+        var thinkFirst = request.Settings.ThinkFirst;
+
+        // Up-front thinking only adds waiting time before a quick conversational reply, so it is turned off where the
+        // model allows it. (Opus 5.5 can't have thinking turned off; low effort keeps it short.) If a request with this
+        // override is ever refused, it is sent again without it, and the override is dropped for that model.
+        string? ThinkingOverride() =>
+            thinkFirst || Refused(model) ? null
+            : model.StartsWith("claude-sonnet-5-5", StringComparison.Ordinal) ? "between_tools"
+            : model.StartsWith("claude-haiku-5", StringComparison.Ordinal) ? "disabled"
+            : null;
+
+        MessageCreateParams Build(string? thinking)
+        {
+            var p = new MessageCreateParams
+            {
+                Model = model,
+                MaxTokens = _maxTokens,
+                System = system,
+                Messages = [new BetaMessageParam { Role = Role.User, Content = content }],
+            };
+            // `effort` is not accepted by Haiku 4.5 (Haiku 5.5 and the other models take it).
+            if (!model.StartsWith("claude-haiku-4", StringComparison.Ordinal))
+                p = p with { OutputConfig = new BetaOutputConfig { Effort = thinkFirst ? Effort.Medium : Effort.Low } };
+            if (thinking == "between_tools") p = p with { Thinking = new BetaThinkingConfigBetweenTools() };
+            else if (thinking == "disabled") p = p with { Thinking = new BetaThinkingConfigDisabled() };
+            if (FallbackModels.Contains(model))
+                // If the safety classifiers decline, the API re-runs the request on a fallback model.
+                p = p with { Betas = [FallbackBeta], Fallbacks = new BetaFallbacksParam(new Default()) };
+            return p;
+        }
 
         string? stopReason = null;
         long input = 0, written = 0, read = 0, output = 0, chars = 0;
         bool started = false;
         try
         {
-            await foreach (var ev in Client().Beta.Messages.CreateStreaming(p, ct))
+            await foreach (var ev in Events(Build, ThinkingOverride(), model, ct))
             {
                 if (ev.TryPickContentBlockDelta(out var delta) && delta.Delta.TryPickText(out var text))
                 {
@@ -140,6 +158,38 @@ public sealed class ClaudeSuggester : ISuggester
 
         if (stopReason == "refusal") yield return "\n(Claude declined to suggest a reply for this.)";
         else if (stopReason == "max_tokens") yield return " …";
+    }
+
+    // Models for which the "thinking" override was refused by the API; they are sent without it from then on.
+    private readonly HashSet<string> _thinkingRefused = new();
+
+    private bool Refused(string model) { lock (_thinkingRefused) return _thinkingRefused.Contains(model); }
+
+    /// <summary>Streams a request. If the API refuses it (a 400) before sending anything while a thinking override
+    /// was set, sends it once more without the override.</summary>
+    private async IAsyncEnumerable<BetaRawMessageStreamEvent> Events(
+        Func<string?, MessageCreateParams> build, string? thinking, string model, [EnumeratorCancellation] CancellationToken ct)
+    {
+        var it = Client().Beta.Messages.CreateStreaming(build(thinking), ct).GetAsyncEnumerator(ct);
+        bool has;
+        try { has = await it.MoveNextAsync(); }
+        catch (AnthropicBadRequestException ex) when (thinking is not null)
+        {
+            AppLog.Warn($"Claude refused the request with thinking turned off ({ex.Message}); sending it without that setting from now on.");
+            lock (_thinkingRefused) _thinkingRefused.Add(model);
+            await it.DisposeAsync();
+            it = Client().Beta.Messages.CreateStreaming(build(null), ct).GetAsyncEnumerator(ct);
+            has = await it.MoveNextAsync();
+        }
+        try
+        {
+            while (has)
+            {
+                yield return it.Current;
+                has = await it.MoveNextAsync();
+            }
+        }
+        finally { await it.DisposeAsync(); }
     }
 
     /// <summary>Cheap check that a key is accepted (lists models; costs nothing).</summary>

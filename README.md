@@ -47,6 +47,8 @@ Two switches sit at the top of the window.
 
 Then:
 
+- The status line under the switches says **LISTENING** (the dot pulses) whenever someone is
+  speaking, and **Waiting for speech** the rest of the time.
 - After someone finishes speaking you get up to a few options to **say**, each with a **Copy**
   button.
 - **Both at once:** with Type on, if someone is talking *and* the text area updates, you get a Say
@@ -84,6 +86,7 @@ screen as it is now.
 | Reply language | Empty = match the other person |
 | About me / extra instructions | Free text: who you are, words to avoid… |
 | Claude model | Sonnet 5.5 (recommended, the default) · Opus 5.5 (best replies, twice the cost) · Haiku 5.5 (cheapest, a twentieth of Sonnet) |
+| Think before replying | Off by default, so a reply starts as soon as it can. On, Claude spends more effort on each reply: slower to start, better on hard or technical questions. |
 | Hide from screen sharing | Keeps every window of the app out of screen shares, recordings and screenshots. Windows 10 version 2004 or later. Off by default; see Privacy below. |
 | Microphone | Also transcribe your own voice, so Claude knows what you've said. Use headphones. |
 | Speech recognition | Fast · Balanced · Accurate (downloads a different model) |
@@ -129,6 +132,15 @@ is also reading a text area), roughly **$1 for an hour of a busy conversation**,
 few cents for the same hour and Opus 5.5 at roughly double Sonnet. Without the cache the same hour
 would have cost roughly three times as much. Turning **Auto-suggest** off (then it only answers when you
 press Send or Panic) or **Type** off (no screen pictures) costs less still.
+
+## Speed
+
+From the end of a sentence to the first words of a suggestion there are four waits: a pause of about
+0.7 seconds that tells the app the sentence is over, transcribing it on your PC, a short 0.4-second
+merge window, and Claude's own time to start answering. To keep the last one short, Sonnet and
+Haiku reply without thinking first (Settings → **Think before replying** turns that back on), and
+Sonnet 5.5 and Haiku 5.5 are the quickest models; Opus 5.5 always thinks a little. If transcribing is
+the slow part on your PC, choose **Fast** under Speech recognition.
 
 ## Privacy and responsible use
 
@@ -198,4 +210,4 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Assistant.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
 | `src/Assistant.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 159 core tests (including the real SDK against a local fake server) and 85 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `tests/` | 177 core tests (including the real SDK against a local fake server) and 89 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |

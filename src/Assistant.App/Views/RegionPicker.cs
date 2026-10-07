@@ -186,53 +186,62 @@ public static class RegionPicker
     }
 }
 
-/// <summary>Four thin bars just outside the watched box, so it stays visible without ever
-/// covering (or being captured with) the text inside it.</summary>
+/// <summary>
+/// Four thin bars just outside the watched box, so it stays visible without ever covering (or being
+/// captured with) the text inside it. On Windows they are exact-size native windows; see
+/// <see cref="Platform.NativeBars"/> for why ordinary windows can't do this.
+/// </summary>
 public sealed class RegionOutline : IDisposable
 {
-    private const int Thickness = 3; // physical pixels
-    private readonly List<Window> _bars = new();
+    public const int Thickness = 3; // physical pixels
 
-    public void Show(Window owner, Region r)
+    private IDisposable? _bars;
+    private IReadOnlyList<IntPtr> _handles = Array.Empty<IntPtr>();
+
+    /// <summary>The native windows currently showing (empty off Windows). For the self-test.</summary>
+    internal IReadOnlyList<IntPtr> Handles => _handles;
+
+    /// <summary>The four bars for a region, as (x, y, width, height) in physical pixels. They touch the
+    /// region's edges from the outside and never overlap it.</summary>
+    public static IReadOnlyList<(int X, int Y, int Width, int Height)> Rects(Region r, int thickness = Thickness)
+    {
+        int t = thickness;
+        return new[]
+        {
+            (r.Left - t, r.Top - t, r.Width + 2 * t, t),         // top
+            (r.Left - t, r.Top + r.Height, r.Width + 2 * t, t),  // bottom
+            (r.Left - t, r.Top, t, r.Height),                    // left
+            (r.Left + r.Width, r.Top, t, r.Height),              // right
+        };
+    }
+
+    public void Show(Region r)
     {
         Hide();
-        var screen = owner.Screens.ScreenFromPoint(new PixelPoint(r.Left + r.Width / 2, r.Top + r.Height / 2)) ?? owner.Screens.Primary;
-        double scale = screen?.Scaling ?? 1.0;
-        int t = Thickness;
-        foreach (var (x, y, w, h) in new[]
+        if (!OperatingSystem.IsWindows()) return;
+        try { ShowWindows(r); }
+        catch (Exception ex)
         {
-            (r.Left - t, r.Top - t, r.Width + 2 * t, t),   // top
-            (r.Left - t, r.Top + r.Height, r.Width + 2 * t, t), // bottom
-            (r.Left - t, r.Top, t, r.Height),               // left
-            (r.Left + r.Width, r.Top, t, r.Height),         // right
-        })
-        {
-            var bar = new Window
-            {
-                SystemDecorations = SystemDecorations.None,
-                ShowInTaskbar = false,
-                ShowActivated = false,
-                Topmost = true,
-                CanResize = false,
-                Focusable = false,
-                Background = new SolidColorBrush(Color.Parse("#D97757")),
-                WindowStartupLocation = WindowStartupLocation.Manual,
-                Position = new PixelPoint(x, y),
-                Width = w / scale,
-                Height = h / scale,
-                MinWidth = 0,
-                MinHeight = 0,
-            };
-            Platform.CaptureShield.Track(bar);
-            bar.Show();
-            _bars.Add(bar);
+            AppLog.Error("Couldn't draw the outline around the text area", ex);
+            Hide();
         }
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private void ShowWindows(Region r)
+    {
+        var bars = new Platform.NativeBars(Rects(r));
+        _bars = bars;
+        _handles = bars.Handles.ToList();
+        foreach (var h in _handles) Platform.CaptureShield.TrackHandle(h);
     }
 
     public void Hide()
     {
-        foreach (var b in _bars) b.Close();
-        _bars.Clear();
+        foreach (var h in _handles) Platform.CaptureShield.UntrackHandle(h);
+        _handles = Array.Empty<IntPtr>();
+        _bars?.Dispose();
+        _bars = null;
     }
 
     public void Dispose() => Hide();

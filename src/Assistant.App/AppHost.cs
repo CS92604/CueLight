@@ -275,7 +275,7 @@ public sealed class AppHost : IDisposable
 
     private void ShowOutline(Region? region)
     {
-        if (region is { } r && _window is not null) _outline.Show(_window, r);
+        if (region is { } r && _window is not null) _outline.Show(r);
         else _outline.Hide();
     }
 
