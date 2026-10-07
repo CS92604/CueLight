@@ -9,7 +9,9 @@
     <AssemblyName>ClaudeLiveAssistant</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <!-- Do NOT turn built-in COM off: the Windows sound library talks to the audio system through it,
+         and with it off the app cannot hear anything. -->
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Version>1.0.0</Version>

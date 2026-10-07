@@ -365,3 +365,37 @@ public class SpeechRuntimeTests : IDisposable
         Assert.Contains(SpeechRuntime.Folder, text);
     }
 }
+
+public class ProjectSettingsTests
+{
+    private static string? FindFile(string relative)
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            var candidate = Path.Combine(dir.FullName, relative);
+            if (File.Exists(candidate)) return candidate;
+        }
+        return null;
+    }
+
+    [Fact]
+    public void Built_in_COM_stays_on_because_the_sound_library_needs_it()
+    {
+        // With it off, NAudio can't reach the Windows audio system ("Built-in COM has been disabled via a
+        // feature switch") and the app hears nothing. Found by the Windows self-test.
+        var csproj = FindFile(Path.Combine("src", "Assistant.App", "Assistant.App.csproj"));
+        if (csproj is null) return; // not running from a source checkout
+        var text = File.ReadAllText(csproj);
+        Assert.DoesNotContain("<BuiltInComInteropSupport>false", text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Only_the_windows_screen_copy_flags_dotnet_accepts_are_used()
+    {
+        // Graphics.CopyFromScreen rejects SourceCopy | CaptureBlt ("copyPixelOperation is invalid"); the
+        // capture code calls BitBlt itself instead. Found by the Windows self-test.
+        var source = FindFile(Path.Combine("src", "Assistant.App", "Platform", "GdiScreenCapture.cs"));
+        if (source is null) return;
+        Assert.DoesNotContain("CopyFromScreen(", string.Join("\n", File.ReadAllLines(source).Where(l => !l.TrimStart().StartsWith("///") && !l.TrimStart().StartsWith("//"))));
+    }
+}

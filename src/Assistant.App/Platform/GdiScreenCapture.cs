@@ -1,5 +1,7 @@
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Assistant.Core;
 using Region = Assistant.Core.Region;
@@ -11,14 +13,44 @@ namespace Assistant.App.Platform;
 public sealed class GdiScreenCapture : IScreenCapture
 {
     private const int MaxEdge = 1568; // longer edges are downscaled by the API anyway
-    private const CopyPixelOperation CaptureBlt = (CopyPixelOperation)0x40000000; // include layered windows
 
+    private const int SrcCopy = 0x00CC0020;
+    private const int CaptureBlt = 0x40000000; // include layered windows (some chat and video apps draw with them)
+
+    [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr hdc);
+    [DllImport("gdi32.dll", SetLastError = true)]
+    private static extern bool BitBlt(IntPtr hdcDest, int x, int y, int cx, int cy, IntPtr hdcSrc, int x1, int y1, int rop);
+
+    /// <summary>Copies the pixels of a screen area. This calls the GDI function itself: .NET's own
+    /// Graphics.CopyFromScreen rejects the "include layered windows" flag as an invalid argument.</summary>
     private static Bitmap Grab(Region r)
     {
         var bmp = new Bitmap(r.Width, r.Height, PixelFormat.Format32bppArgb);
-        using var g = Graphics.FromImage(bmp);
-        g.CopyFromScreen(r.Left, r.Top, 0, 0, new Size(r.Width, r.Height), CopyPixelOperation.SourceCopy | CaptureBlt);
-        return bmp;
+        try
+        {
+            using var g = Graphics.FromImage(bmp);
+            var screen = GetDC(IntPtr.Zero);
+            if (screen == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+            var target = g.GetHdc();
+            try
+            {
+                // Fails (access denied) while the screen is locked or a UAC prompt is up; the watcher copes with that.
+                if (!BitBlt(target, 0, 0, r.Width, r.Height, screen, r.Left, r.Top, SrcCopy | CaptureBlt))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+            finally
+            {
+                g.ReleaseHdc(target);
+                ReleaseDC(IntPtr.Zero, screen);
+            }
+            return bmp;
+        }
+        catch
+        {
+            bmp.Dispose();
+            throw;
+        }
     }
 
     private static byte[] ToPng(Bitmap bmp)
@@ -51,7 +83,7 @@ public sealed class GdiScreenCapture : IScreenCapture
         try
         {
             var bytes = new byte[Math.Abs(data.Stride) * bmp.Height];
-            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, bytes, 0, bytes.Length);
+            Marshal.Copy(data.Scan0, bytes, 0, bytes.Length);
             return (bytes, bmp.Width, bmp.Height);
         }
         finally { bmp.UnlockBits(data); }

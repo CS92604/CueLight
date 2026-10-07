@@ -52,8 +52,9 @@ internal static class SelfTest
 
         Line($"Running as: {Environment.ProcessPath} · single file: {string.IsNullOrEmpty(typeof(SelfTest).Assembly.Location)}");
         Step("speech engine", () => Speech(Arg(args, "--wav"), Arg(args, "--expect"), args.Contains("--require-vc")), essential: true);
-        Step("sound devices", Audio, essential: false);
-        Step("screen capture", ScreenCapture, essential: false);
+        Step("audio system", AudioSystem, essential: true);   // works with no sound device at all
+        Step("sound devices", Audio, essential: false);       // a CI machine has none
+        Step("screen capture", ScreenCapture, essential: true);
 
         int ui = 0;
         try { ui = Program.BuildAvaloniaApp(softwareRendering: true).StartWithClassicDesktopLifetime(args); }
@@ -141,6 +142,18 @@ internal static class SelfTest
     private static float[] Tone() =>
         Enumerable.Range(0, 32000).Select(i => 0.1f * MathF.Sin(2 * MathF.PI * 220 * i / 16000f)).ToArray();
 
+    /// <summary>Talks to the Windows audio system. Needs COM, which must not be switched off; works even with no
+    /// speakers or microphone, so a machine without sound hardware can still prove it.</summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void AudioSystem()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var enumerator = new NAudio.CoreAudioApi.MMDeviceEnumerator();
+        bool speakers = enumerator.HasDefaultAudioEndpoint(NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.Role.Multimedia);
+        bool microphone = enumerator.HasDefaultAudioEndpoint(NAudio.CoreAudioApi.DataFlow.Capture, NAudio.CoreAudioApi.Role.Console);
+        Line($"ok    audio system reachable (speakers: {(speakers ? "yes" : "none")}, microphone: {(microphone ? "yes" : "none")})");
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Audio()
     {
@@ -163,9 +176,12 @@ internal static class SelfTest
 
     private static void ScreenCapture()
     {
+        if (!OperatingSystem.IsWindows()) return;
         var (bgra, w, h) = new GdiScreenCapture().GrabBgra(new Region(0, 0, 64, 64));
         bool black = bgra.Where((b, i) => i % 4 != 3).All(b => b == 0);
         Line($"{(black ? "note" : "ok  ")}  screen capture returned {w}×{h}{(black ? " (all black: no desktop attached?)" : "")}");
+        var png = new GdiScreenCapture().CapturePng(new Region(0, 0, 200, 100));
+        Line($"ok    screen capture as a PNG: {png.Length} bytes");
     }
 
     // -- the windows ----------------------------------------------------------------------------

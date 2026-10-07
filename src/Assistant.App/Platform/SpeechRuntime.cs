@@ -164,9 +164,10 @@ public static class SpeechRuntime
         foreach (ProcessModule m in me.Modules)
         {
             var name = m.ModuleName ?? "";
+            // msvcp140.dll etc. are the Visual C++ runtime; Windows' own msvcp_win.dll is a different library.
             if (name.StartsWith("whisper", StringComparison.OrdinalIgnoreCase) || name.StartsWith("ggml", StringComparison.OrdinalIgnoreCase)
-                || name.StartsWith("msvcp", StringComparison.OrdinalIgnoreCase) || name.StartsWith("vcruntime", StringComparison.OrdinalIgnoreCase)
-                || name.StartsWith("vcomp", StringComparison.OrdinalIgnoreCase))
+                || name.StartsWith("msvcp140", StringComparison.OrdinalIgnoreCase) || name.StartsWith("vcruntime140", StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("vcomp140", StringComparison.OrdinalIgnoreCase))
                 yield return $"{name} ← {m.FileName}";
         }
     }
