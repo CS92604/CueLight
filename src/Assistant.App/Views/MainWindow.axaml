@@ -108,19 +108,33 @@
         <Border Classes="card">
           <StackPanel Spacing="10">
             <TextBlock Classes="eyebrow" Text="CONVERSATION" />
-            <TextBlock IsVisible="{Binding !HasTurns}" Classes="muted" TextWrapping="Wrap" LineHeight="20"
+            <TextBlock IsVisible="{Binding ShowNothingYet}" Classes="muted" TextWrapping="Wrap" LineHeight="20"
                        Text="Nothing yet. Whatever your speakers play shows up here, transcribed on this PC." />
-            <ScrollViewer x:Name="TranscriptScroll" MaxHeight="156" IsVisible="{Binding HasTurns}" VerticalScrollBarVisibility="Auto">
-              <ItemsControl ItemsSource="{Binding Turns}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:TurnVm">
-                    <Grid ColumnDefinitions="46,*" Margin="0,0,0,7">
-                      <TextBlock Text="{Binding Who}" Classes="who small" Classes.me="{Binding IsMe}" FontWeight="SemiBold" Margin="0,1,0,0" />
-                      <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" LineHeight="20" />
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+            <ScrollViewer x:Name="TranscriptScroll" MaxHeight="156" IsVisible="{Binding ShowTranscript}" VerticalScrollBarVisibility="Auto">
+              <StackPanel>
+                <ItemsControl ItemsSource="{Binding Turns}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TurnVm">
+                      <Grid ColumnDefinitions="46,*" Margin="0,0,0,7">
+                        <TextBlock Text="{Binding Who}" Classes="who small" Classes.me="{Binding IsMe}" FontWeight="SemiBold" Margin="0,1,0,0" />
+                        <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" LineHeight="20" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <!-- What is being said right now: the words so far (grey) and three pulsing dots. The real transcript replaces it. -->
+                <Grid x:Name="LiveRow" ColumnDefinitions="46,*" Margin="0,0,0,2" IsVisible="{Binding ShowLive}">
+                  <TextBlock Text="{Binding LiveWho}" Classes="who small" Classes.me="{Binding LiveIsMe}" FontWeight="SemiBold" Margin="0,1,0,0" />
+                  <StackPanel Grid.Column="1" Spacing="5">
+                    <TextBlock Text="{Binding LiveText}" IsVisible="{Binding HasLiveText}" Classes="muted" TextWrapping="Wrap" LineHeight="20" />
+                    <StackPanel Orientation="Horizontal" Spacing="4" Height="14" Margin="0,0,0,2">
+                      <Ellipse Classes="typing d1" />
+                      <Ellipse Classes="typing d2" />
+                      <Ellipse Classes="typing d3" />
+                    </StackPanel>
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
             </ScrollViewer>
           </StackPanel>
         </Border>
@@ -169,6 +183,7 @@
                 <StackPanel Spacing="8" Margin="0,0,0,12">
                   <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsChip}" Margin="4,0,0,0">
                     <Border Classes="chip say" IsVisible="{Binding IsSay}" ToolTip.Tip="SAY: something to say out loud in the conversation."><TextBlock Text="SAY" /></Border>
+                    <Border Classes="chip answer" IsVisible="{Binding IsAnswer}" ToolTip.Tip="ANSWER: a fuller answer to the question that was just asked, to say in your own words or draw from. SAY is the quick, conversational reply; this is the explanation behind it."><TextBlock Text="ANSWER" /></Border>
                     <Border Classes="chip type" IsVisible="{Binding IsType}" ToolTip.Tip="TYPE: a reply to type or paste into the text area you selected."><TextBlock Text="TYPE" /></Border>
                     <TextBlock Text="{Binding Hint}" Classes="faint small" VerticalAlignment="Center" />
                   </StackPanel>

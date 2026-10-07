@@ -19,7 +19,14 @@ public partial class MainWindow : Window
         DataContextChanged += (_, _) =>
         {
             if (DataContext is MainViewModel vm)
+            {
                 vm.Turns.CollectionChanged += OnTurnsChanged;
+                vm.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName is nameof(MainViewModel.LiveText) or nameof(MainViewModel.ShowLive))
+                        Dispatcher.UIThread.Post(() => TranscriptScroll.ScrollToEnd(), DispatcherPriority.Background);
+                };
+            }
         };
     }
 

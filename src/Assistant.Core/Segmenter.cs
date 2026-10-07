@@ -6,7 +6,7 @@ namespace Assistant.Core;
 /// </summary>
 public sealed class Segmenter
 {
-    private readonly int _frame, _silenceFrames, _minSpeechFrames, _maxFrames;
+    private readonly int _frame, _frameMs, _silenceFrames, _minSpeechFrames, _maxFrames;
     private readonly float _minRms, _noiseFactor;
     private readonly int _prerollFrames;
     private readonly Queue<float[]> _preroll = new();
@@ -19,6 +19,22 @@ public sealed class Segmenter
     /// <summary>True once enough speech has been heard to be worth transcribing (a click or a cough shorter than
     /// that never counts), until the pause that ends it. A short pause between words doesn't end it.</summary>
     public bool IsSpeaking => _active.Count > 0 && _speech >= _minSpeechFrames;
+
+    /// <summary>How many 30 ms stretches of actual voice the speech in progress has had so far (pauses don't count).</summary>
+    public int VoicedFrames => _active.Count > 0 ? _speech : 0;
+
+    /// <summary>The audio of the speech in progress (everything since it began, at most the latest
+    /// <paramref name="maxSeconds"/>), for a live preview. Null when nobody is speaking.</summary>
+    public float[]? SnapshotSpeech(double maxSeconds = 12)
+    {
+        if (!IsSpeaking) return null;
+        int keep = Math.Max(1, (int)(maxSeconds * 1000 / _frameMs));
+        int skip = Math.Max(0, _active.Count - keep);
+        var result = new float[(_active.Count - skip) * _frame];
+        int pos = 0;
+        for (int i = skip; i < _active.Count; i++) { _active[i].CopyTo(result, pos); pos += _frame; }
+        return result;
+    }
 
     /// <summary>Raised when <see cref="IsSpeaking"/> changes. Runs on the thread that feeds the segmenter.</summary>
     public event Action<bool>? SpeakingChanged;
@@ -35,6 +51,7 @@ public sealed class Segmenter
         double maxUtteranceS = 25, int prerollMs = 240, float minRms = 0.008f, float noiseFactor = 3f)
     {
         _frame = sampleRate * frameMs / 1000;
+        _frameMs = frameMs;
         _silenceFrames = Math.Max(1, silenceMs / frameMs);
         _minSpeechFrames = Math.Max(1, minSpeechMs / frameMs);
         _maxFrames = (int)(maxUtteranceS * 1000 / frameMs);

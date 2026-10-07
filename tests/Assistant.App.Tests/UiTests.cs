@@ -797,6 +797,81 @@ public class UiTests
     }
 
     [AvaloniaFact]
+    public void The_conversation_shows_words_as_they_are_said_with_animated_dots()
+    {
+        using var rig = Rig.Make();
+        Assert.True(rig.Vm.ShowNothingYet);
+        Assert.False(rig.Vm.ShowLive);
+
+        rig.Engine.SetSpeaking(Speaker.Them, true);              // speech has begun, but no words yet: just the dots
+        Pump(() => rig.Vm.ShowLive);
+        Settle();
+        Assert.False(rig.Vm.HasLiveText);
+        Assert.False(rig.Vm.ShowNothingYet);
+        var row = rig.Window.FindControl<Grid>("LiveRow")!;
+        Assert.True(row.IsEffectivelyVisible);
+        var dots = row.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().Where(e => e.Classes.Contains("typing")).ToList();
+        Assert.Equal(3, dots.Count);
+        Assert.All(dots, d => Assert.True(d.IsEffectivelyVisible));
+        Assert.Equal("Them", rig.Vm.LiveWho);
+
+        rig.Engine.SetLive(Speaker.Them, "The dog that played Toto in the Wizard of Oz was credited as");
+        Pump(() => rig.Vm.HasLiveText);
+        Settle();
+        var words = row.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == rig.Vm.LiveText);
+        Assert.True(words.IsEffectivelyVisible);
+        Assert.Equal("The dog that played Toto in the Wizard of Oz was credited as", words.Text);
+        Shot(rig.Window, "main-live-light");
+
+        rig.Engine.SetSpeaking(Speaker.Them, false);              // the sentence is over; the words stay until the transcript is in
+        Pump(() => !rig.Vm.IsHearing);
+        Assert.True(rig.Vm.ShowLive);
+        Assert.True(rig.Vm.HasLiveText);
+
+        rig.Engine.AddTurn(Speaker.Them, "The dog that played Toto in the Wizard of Oz was credited as Toto.");
+        rig.Engine.SetLive(Speaker.Them, null);
+        Pump(() => !rig.Vm.ShowLive);
+        Assert.Single(rig.Vm.Turns);
+        Assert.False(row.IsEffectivelyVisible);
+    }
+
+    [AvaloniaFact]
+    public void Your_own_live_words_are_labelled_You_and_recording_off_hides_the_live_line()
+    {
+        using var rig = Rig.Make();
+        rig.Engine.SetSpeaking(Speaker.Me, true);
+        rig.Engine.SetLive(Speaker.Me, "I think so, let me check");
+        Pump(() => rig.Vm.HasLiveText);
+        Assert.Equal("You", rig.Vm.LiveWho);
+        Assert.True(rig.Vm.LiveIsMe);
+
+        rig.Vm.IsRecording = false;
+        Pump(() => !rig.Vm.ShowLive);
+        Assert.Equal("", rig.Vm.LiveText);
+        Assert.True(rig.Vm.ShowNothingYet);
+    }
+
+    [AvaloniaFact]
+    public void A_fuller_answer_gets_its_own_labelled_box_beside_the_conversational_reply()
+    {
+        using var rig = Rig.Make(reply:
+            "SAY\n• It was Toto, believe it or not.\n• Toto. Same as the character.\n" +
+            "ANSWER\n• The dog was credited as Toto, the character's own name. Her real name was Terry, and she earned more a week than many of the human cast.\n");
+        Pump(() => rig.Vm.Sections.Count == 0);
+        rig.Engine.AddTurn(Speaker.Them, "The dog that played Toto in the Wizard of Oz was credited as what?");
+        Pump(() => rig.Vm.Sections.Count == 2 && rig.Vm.Sections[1].Options.Count == 1 && rig.Vm.Sections[1].Options[0].IsComplete);
+        Settle();
+
+        Assert.Equal(new[] { SectionKind.Say, SectionKind.Answer }, rig.Vm.Sections.Select(s => s.Kind));
+        Assert.Equal("Answer", rig.Vm.Sections[1].Title);
+        Assert.Equal("in depth", rig.Vm.Sections[1].Hint);
+        var chip = rig.Window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("chip") && b.Classes.Contains("answer") && b.IsEffectivelyVisible);
+        Assert.Contains("ANSWER:", ToolTip.GetTip(chip) as string);
+        Assert.Equal(3, rig.Window.GetVisualDescendants().OfType<Border>().Count(b => b.Classes.Contains("option") && b.IsEffectivelyVisible));   // two replies and the answer
+        Shot(rig.Window, "main-answer-light");
+    }
+
+    [AvaloniaFact]
     public void Tooltip_card_screenshot()
     {
         // A ToolTip normally lives in a popup; drawn in place it shows how the card is styled and wraps.

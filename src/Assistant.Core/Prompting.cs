@@ -35,8 +35,9 @@ public static class Prompting
 
         Your job is to tell the user what to say or type next, in their own voice, so it sounds like a real person wrote it.
 
-        Two channels:
-        - SAY: what the user should say out loud in reply to the spoken conversation.
+        Two channels, and up to three kinds of section:
+        - SAY: what the user should say out loud, in the flow of the conversation, ready to be spoken. If the other person asked the user something, the SAY options answer it directly and briefly, in the user's voice. Don't dodge a question by asking it back (one option may ask a short clarifying question).
+        - ANSWER: only when the other person asked a question, set a problem or riddle, or left a sentence hanging for an answer. One option: a direct, thorough answer the user can read out or draw from. The answer first, then the explanation, examples or key facts behind it, in up to about eight sentences, whatever the Length setting says (that applies to SAY and TYPE). The Proficiency setting still decides how technical it is. General knowledge is fine; if you aren't sure of a fact, say so inside the answer. Leave ANSWER out for plain statements and small talk.
         - TYPE: what the user should type in reply to the written text in the screen region. Treat the newest message not written by the user as the one that needs a reply.
 
         Requests are sent when the other person pauses, and a pause means it is the user's turn. If their last words are a question, a quiz or riddle, or a sentence left hanging for the user to finish or answer, they are waiting for the user: give the answer, or the most likely way to finish the sentence, as the first option (say so inside the option if you aren't sure), then other angles. If a request says it has been quiet for several seconds, they are waiting for the user even more clearly: reply.
@@ -49,6 +50,8 @@ public static class Prompting
         SAY
         • option
         • option
+        ANSWER
+        • the thorough answer
         TYPE
         • option
 
@@ -155,13 +158,13 @@ public static class Prompting
     }
 }
 
-public enum SectionKind { Say, Type, Note }
+public enum SectionKind { Say, Type, Answer, Note }
 
 public sealed record Section(SectionKind Kind, List<string> Options);
 
 public static partial class SuggestionParser
 {
-    [GeneratedRegex(@"^\s*(?:#+\s*)?\**\s*(SAY|TYPE)\s*:?\s*\**\s*$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^\s*(?:#+\s*)?\**\s*(SAY|TYPE|ANSWER)\s*:?\s*\**\s*$", RegexOptions.IgnoreCase)]
     private static partial Regex Heading();
 
     [GeneratedRegex(@"^\s*(?:[•\-\*]|\d+[.)])\s+(\S.*)$")]
@@ -180,8 +183,12 @@ public static partial class SuggestionParser
             var heading = Heading().Match(line);
             if (heading.Success)
             {
-                current = new Section(heading.Groups[1].Value.Equals("say", StringComparison.OrdinalIgnoreCase)
-                    ? SectionKind.Say : SectionKind.Type, new List<string>());
+                current = new Section(heading.Groups[1].Value.ToUpperInvariant() switch
+                {
+                    "SAY" => SectionKind.Say,
+                    "ANSWER" => SectionKind.Answer,
+                    _ => SectionKind.Type,
+                }, new List<string>());
                 sections.Add(current);
                 continue;
             }

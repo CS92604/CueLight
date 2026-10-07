@@ -49,8 +49,23 @@ Then:
 
 - The status line under the switches says **LISTENING** (the dot pulses) whenever someone is
   speaking, and **Waiting for speech** the rest of the time.
+<p align="center">
+  <img src="docs/main-live-light.png" width="260" alt="Live words with pulsing dots while someone speaks">
+  <img src="docs/main-answer-light.png" width="260" alt="A conversational reply and a fuller ANSWER box">
+</p>
+
+- **Live words.** While someone is speaking, the **Conversation** box shows what they are saying as
+  they say it (in grey, with three pulsing dots), and the finished transcript replaces it. The
+  speech so far is re-read about once a second whenever the speech model has nothing more
+  important to do (a finished sentence always goes first), so it uses some extra processor time
+  while people talk; on a slow PC choose **Fast** under Speech recognition.
 - After someone finishes speaking you get up to a few options to **say**, each with a **Copy**
-  button.
+  button. If they asked you something, these answer it directly and briefly, in your voice.
+- **ANSWER.** When the other person asks a question, sets a riddle or leaves a sentence hanging, a
+  second, green-labelled box gives a fuller answer to say in your own words or draw from: the
+  answer first, then the explanation behind it. It is separate from the quick conversational reply,
+  and it appears only when there is something to answer. Claude is told to say so inside the
+  answer when it isn't sure of a fact, so check anything that matters.
 - **Both at once:** with Type on, if someone is talking *and* the text area updates, you get a Say
   section and a Type section together, consistent with each other.
 - **Panic** (shown when Type is on) forces Claude to read the text area *right now* and answer
@@ -210,4 +225,4 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Assistant.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
 | `src/Assistant.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 177 core tests (including the real SDK against a local fake server) and 89 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `tests/` | 202 core tests (including the real SDK against a local fake server) and 93 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |

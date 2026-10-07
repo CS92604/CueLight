@@ -15,6 +15,10 @@ public interface IAudioSource : IDisposable
     /// can't tell just never raises it.</summary>
     event Action<bool>? Speaking { add { } remove { } }
 
+    /// <summary>While someone is speaking: all of the speech so far, about once a second, so the words can be shown
+    /// before the sentence is over. Optional.</summary>
+    event Action<float[]>? Partial { add { } remove { } }
+
     void Start();
 }
 
@@ -39,6 +43,13 @@ public sealed class AudioIngest
 
     /// <summary>Speech started (true) or ended (false) on this device.</summary>
     public event Action<bool>? SpeakingChanged;
+
+    /// <summary>While speech goes on: the speech so far, first after about half a second and then every second.</summary>
+    public event Action<float[]>? Partial;
+
+    // Voiced 30 ms frames of new speech needed before the next preview: about half a second for the first, then a second.
+    private const int FirstPartialFrames = 17, PartialFrames = 33;
+    private int _voicedAtLastPartial, _framesForNextPartial = FirstPartialFrames;
 
     public AudioIngest(int sampleRate, int channels, Action<float[]> onUtterance, Func<double>? clock = null)
     {
@@ -80,6 +91,20 @@ public sealed class AudioIngest
     private void Push(float[] mono16k)
     {
         foreach (var utt in _segmenter.Feed(mono16k)) _onUtterance(utt);
+
+        if (!_segmenter.IsSpeaking)
+        {
+            _voicedAtLastPartial = 0;
+            _framesForNextPartial = FirstPartialFrames;
+            return;
+        }
+        // Counting frames of real voice (not time) means a trailing pause never triggers another preview of the same words.
+        int voiced = _segmenter.VoicedFrames;
+        if (voiced < _voicedAtLastPartial) _voicedAtLastPartial = 0;   // a new sentence began inside this chunk
+        if (voiced - _voicedAtLastPartial < _framesForNextPartial) return;
+        _voicedAtLastPartial = voiced;
+        _framesForNextPartial = PartialFrames;
+        if (_segmenter.SnapshotSpeech() is { } speech) Partial?.Invoke(speech);
     }
 }
 
@@ -108,6 +133,11 @@ public static partial class TranscriptCleaner
 /// <summary>
 /// Transcribes utterances one at a time and feeds them to the engine. Utterances that arrive
 /// while the speech model is still loading wait (a small backlog is kept, oldest dropped).
+///
+/// It also keeps a live preview: while someone is speaking, the speech so far is transcribed again about
+/// once a second (whenever the speech model has nothing more important to do) and handed to the engine as
+/// <see cref="Engine.SetLive"/>, so the words show up as they are said. A finished utterance always goes
+/// first, and cuts a preview short. The preview is replaced by the real transcript when that is ready.
 /// </summary>
 public sealed class AudioPipeline : IDisposable
 {
@@ -119,6 +149,19 @@ public sealed class AudioPipeline : IDisposable
     private readonly Func<DateTime> _now;
     private DateTime _lastBehindNotice = DateTime.MinValue;
     private Task? _loop;
+
+    // Live preview state (guarded by _live): the newest speech audio per speaker not yet previewed, who is
+    // speaking, the preview pass in progress, and the earliest time the next pass may start.
+    private readonly object _live = new();
+    private readonly Dictionary<Speaker, float[]> _partials = new();
+    private readonly HashSet<Speaker> _speaking = new();
+    private CancellationTokenSource? _partialCts;
+    private DateTime _partialAllowedAfter = DateTime.MinValue;
+    private readonly SemaphoreSlim _work = new(0);
+
+    /// <summary>The least time between two preview passes. A pass that took longer makes the next wait that long too,
+    /// so on a slow PC the preview never takes more than half of the speech model's time.</summary>
+    public TimeSpan PreviewMinGap { get; init; } = TimeSpan.FromMilliseconds(700);
 
     /// <summary>Shown when speech arrives faster than this PC can transcribe it and the oldest is skipped.</summary>
     public const string FallingBehind =
@@ -152,8 +195,31 @@ public sealed class AudioPipeline : IDisposable
     public void Add(Speaker who, IAudioSource source)
     {
         string? lastFailure = null;
-        source.Utterance += audio => _queue.Writer.TryWrite((who, audio));
-        source.Speaking += on => _engine.SetSpeaking(who, on);
+        source.Utterance += audio =>
+        {
+            if (!_queue.Writer.TryWrite((who, audio))) return;
+            lock (_live) _partialCts?.Cancel();   // a finished utterance goes before any preview
+            _work.Release();
+        };
+        source.Speaking += on =>
+        {
+            lock (_live)
+            {
+                if (on) _speaking.Add(who);
+                else { _speaking.Remove(who); _partials.Remove(who); }
+            }
+            _engine.SetSpeaking(who, on);
+            if (on) _engine.SetLive(who, null);   // new speech: whatever preview was showing is old
+        };
+        source.Partial += audio =>
+        {
+            lock (_live)
+            {
+                if (!_speaking.Contains(who)) return;
+                _partials[who] = audio;
+            }
+            _work.Release();
+        };
         source.Failed += msg => { lastFailure = msg; _engine.RaiseError(msg); };
         source.Recovered += () => { if (lastFailure is { } failed) _engine.RaiseRecovered(failed); lastFailure = null; };
         lock (_sources) _sources.Add(source);
@@ -185,18 +251,73 @@ public sealed class AudioPipeline : IDisposable
 
         try
         {
-            await foreach (var (who, audio) in _queue.Reader.ReadAllAsync(_cts.Token))
+            while (true)
             {
-                try
-                {
-                    var text = TranscriptCleaner.Clean(await stt.TranscribeAsync(audio, _cts.Token));
-                    if (text.Length > 0) _engine.AddTurn(who, text);
-                }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { _engine.RaiseError($"Transcription failed: {ex.Message}"); }
+                await _work.WaitAsync(_cts.Token);
+                while (_queue.Reader.TryRead(out var item)) await TranscribeAsync(stt, item.Who, item.Audio);
+                await PreviewAsync(stt);
             }
         }
         catch (OperationCanceledException) { }
+    }
+
+    private async Task TranscribeAsync(ISpeechToText stt, Speaker who, float[] audio)
+    {
+        try
+        {
+            var text = TranscriptCleaner.Clean(await stt.TranscribeAsync(audio, _cts.Token));
+            if (text.Length > 0) _engine.AddTurn(who, text);
+            // The preview was only ever a stand-in for this: it goes now, unless new speech has begun since.
+            bool speakingAgain;
+            lock (_live) speakingAgain = _speaking.Contains(who);
+            if (!speakingAgain) _engine.SetLive(who, null);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { _engine.RaiseError($"Transcription failed: {ex.Message}"); }
+    }
+
+    /// <summary>One live preview pass, if someone is speaking and the speech model has had a rest.</summary>
+    private async Task PreviewAsync(ISpeechToText stt)
+    {
+        Speaker who = default;
+        float[] audio = Array.Empty<float>();
+        CancellationTokenSource cts = null!;
+        TimeSpan? comeBackIn = null;
+        lock (_live)
+        {
+            if (_partials.Count == 0) return;
+            var now = _now();
+            if (now < _partialAllowedAfter) comeBackIn = _partialAllowedAfter - now;   // too soon after the last pass: keep it, try again then
+            else
+            {
+                (who, audio) = _partials.First();
+                _partials.Remove(who);
+                _partialCts = cts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            }
+        }
+        if (comeBackIn is { } wait)
+        {
+            _ = Task.Delay(wait + TimeSpan.FromMilliseconds(5), _cts.Token).ContinueWith(t => { if (!t.IsCanceled) _work.Release(); });
+            return;
+        }
+
+        var started = _now();
+        string text;
+        try { text = TranscriptCleaner.Clean(await stt.TranscribeAsync(audio, cts.Token)); }
+        catch (OperationCanceledException) when (!_cts.IsCancellationRequested) { return; }  // a finished utterance came in; it goes first
+        catch (OperationCanceledException) { throw; }
+        catch (Exception) { return; }   // a preview is a nicety; the real transcription reports real problems
+        finally
+        {
+            lock (_live) { _partialCts = null; }
+            cts.Dispose();
+        }
+
+        var took = _now() - started;
+        lock (_live) _partialAllowedAfter = _now() + (took > PreviewMinGap ? took : PreviewMinGap);
+        bool stillRelevant;
+        lock (_live) stillRelevant = _speaking.Contains(who);
+        if (text.Length > 0 && stillRelevant) _engine.SetLive(who, text);
     }
 
     public void Dispose()

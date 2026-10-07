@@ -37,6 +37,7 @@ public sealed class WasapiAudioSource : IAudioSource, IMMNotificationClient
 
     public event Action<float[]>? Utterance;
     public event Action<bool>? Speaking;
+    public event Action<float[]>? Partial;
     public event Action<string>? Failed;
     public event Action? Recovered;
 
@@ -72,6 +73,7 @@ public sealed class WasapiAudioSource : IAudioSource, IMMNotificationClient
 
                 var ingest = new AudioIngest(format.SampleRate, format.Channels, a => Utterance?.Invoke(a));
                 ingest.SpeakingChanged += on => Speaking?.Invoke(on);
+                ingest.Partial += a => Partial?.Invoke(a);
                 capture.DataAvailable += (_, e) => OnData(ingest, format, e.Buffer, e.BytesRecorded);
                 capture.RecordingStopped += (_, e) =>
                 {

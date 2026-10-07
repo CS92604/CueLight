@@ -240,6 +240,34 @@ public class PromptTests
     }
 
     [Fact]
+    public void The_prompt_asks_for_a_direct_reply_and_a_separate_in_depth_answer()
+    {
+        Assert.Contains("ANSWER: only when the other person asked a question", Prompting.SystemPrompt);
+        Assert.Contains("the SAY options answer it directly and briefly", Prompting.SystemPrompt);
+        Assert.Contains("Don't dodge a question by asking it back", Prompting.SystemPrompt);
+        Assert.Contains("whatever the Length setting says", Prompting.SystemPrompt);   // the answer is not squeezed by "brief"
+        Assert.Contains("ANSWER\n• the thorough answer", Prompting.SystemPrompt);
+    }
+
+    [Fact]
+    public void An_answer_section_is_parsed_between_say_and_type()
+    {
+        var sections = SuggestionParser.Parse(
+            "SAY\n• Toto, believe it or not.\n• It was Toto.\nANSWER\n• The dog was credited as Toto. Her real name was Terry,\n  and she was paid more than most of the human cast.\nTYPE\n• Toto!");
+        Assert.Equal(new[] { SectionKind.Say, SectionKind.Answer, SectionKind.Type }, sections.Select(s => s.Kind));
+        Assert.Equal(2, sections[0].Options.Count);
+        Assert.Equal("The dog was credited as Toto. Her real name was Terry, and she was paid more than most of the human cast.", Assert.Single(sections[1].Options));
+    }
+
+    [Theory]
+    [InlineData("ANSWER")]
+    [InlineData("answer:")]
+    [InlineData("**ANSWER**")]
+    [InlineData("## Answer")]
+    public void The_answer_heading_is_recognised_however_it_is_written(string heading) =>
+        Assert.Equal(SectionKind.Answer, Assert.Single(SuggestionParser.Parse(heading + "\n• It is Toto.")).Kind);
+
+    [Fact]
     public void A_pause_is_the_users_turn_and_a_hanging_question_gets_an_answer()
     {
         Assert.Contains("a pause means it is the user's turn", Prompting.SystemPrompt);

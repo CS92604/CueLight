@@ -65,10 +65,42 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isRecording = true;
     [ObservableProperty] private bool _typeEnabled;
     [ObservableProperty] private bool _isHearing;
+    [ObservableProperty] private string _liveText = "";
+    private Speaker _liveWho = Speaker.Them;
     [ObservableProperty] private string _costText = "$0.00";
     [ObservableProperty] private string _costTip = CostTipFor(new UsageSnapshot(0, 0, 0, 0, 0, 0m, false));
 
     public bool HasTurns => Turns.Count > 0;
+
+    // The line at the end of the conversation that shows words as they are being said, with animated dots.
+    public bool HasLiveText => LiveText.Length > 0;
+    public bool ShowLive => IsRecording && (IsHearing || HasLiveText);
+    public string LiveWho => _liveWho == Speaker.Me ? "You" : "Them";
+    public bool LiveIsMe => _liveWho == Speaker.Me;
+    public bool ShowTranscript => HasTurns || ShowLive;
+    public bool ShowNothingYet => !ShowTranscript;
+
+    private void RaiseLiveProperties()
+    {
+        OnPropertyChanged(nameof(HasLiveText));
+        OnPropertyChanged(nameof(ShowLive));
+        OnPropertyChanged(nameof(LiveWho));
+        OnPropertyChanged(nameof(LiveIsMe));
+        OnPropertyChanged(nameof(ShowTranscript));
+        OnPropertyChanged(nameof(ShowNothingYet));
+    }
+
+    /// <summary>Takes the live words (and who is saying them) from the engine.</summary>
+    private void RefreshLive()
+    {
+        var them = _engine.LiveText(Speaker.Them);
+        var me = _engine.LiveText(Speaker.Me);
+        string? text = them ?? me;
+        _liveWho = them is not null ? Speaker.Them : me is not null ? Speaker.Me : _engine.HearingWho ?? Speaker.Them;
+        LiveText = text ?? "";
+        RaiseLiveProperties();
+    }
+    partial void OnLiveTextChanged(string value) => RaiseLiveProperties();
     public bool HasSections => Sections.Count > 0;
 
     public string EmptyHint => TypeEnabled
@@ -116,7 +148,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnStatusChanged(StatusKind value) => RaiseStatusProperties();
     partial void OnStatusTextChanged(string value) => OnPropertyChanged(nameof(StatusLine));
-    partial void OnIsHearingChanged(bool value) => RaiseStatusProperties();
+    partial void OnIsHearingChanged(bool value)
+    {
+        RaiseStatusProperties();
+        RaiseLiveProperties();
+    }
     partial void OnShowProgressChanged(bool value) => OnPropertyChanged(nameof(ProgressVisible));
     partial void OnCanRetryChanged(bool value) => OnPropertyChanged(nameof(RetryVisible));
 
@@ -131,6 +167,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             SetListening();
         }
         RaiseStatusProperties();
+        RaiseLiveProperties();
         _recordingChanged?.Invoke(value);
     }
 
@@ -197,6 +234,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 Turns.Add(new TurnVm(e.Speaker ?? Speaker.Them, e.Text ?? ""));
                 while (Turns.Count > MaxTurnsShown) Turns.RemoveAt(0);
                 OnPropertyChanged(nameof(HasTurns));
+                OnPropertyChanged(nameof(ShowTranscript));
+                OnPropertyChanged(nameof(ShowNothingYet));
                 break;
             case EngineEventKind.SuggestStart:
                 _raw = "";
@@ -224,6 +263,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 break;
             case EngineEventKind.Hearing:
                 IsHearing = _engine.IsHearingSpeech;
+                RefreshLive();
+                break;
+            case EngineEventKind.Live:
+                RefreshLive();
                 break;
             case EngineEventKind.Usage:
                 var usage = _engine.Usage.Snapshot();
@@ -311,6 +354,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Sections.Clear();
         OnPropertyChanged(nameof(HasTurns));
         OnPropertyChanged(nameof(HasSections));
+        RaiseLiveProperties();
     }
 
     [RelayCommand] private Task SelectRegion() => _pickRegion();

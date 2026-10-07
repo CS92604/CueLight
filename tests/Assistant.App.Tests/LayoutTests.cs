@@ -170,6 +170,30 @@ public class LayoutTests
     }
 
     [AvaloniaFact]
+    public void The_live_words_stay_inside_the_conversation_card_at_every_width()
+    {
+        using var rig = FullMain();
+        var w = rig.Window;
+        rig.Engine.SetSpeaking(Speaker.Them, true);
+        rig.Engine.SetLive(Speaker.Them, "If P equals NP it means that finding optimal solutions to incredibly complex problems, like protein folding and encryption cracking, is fundamentally easy");
+        UiTests.Pump(() => rig.Vm.HasLiveText);
+        foreach (var width in new[] { 440.0, 420.0 })
+        {
+            w.Width = width;
+            UiTests.Settle();
+            var row = w.FindControl<Grid>("LiveRow")!;
+            var card = Shown<Border>(w).First(b => Has(b, "card") && row.GetVisualAncestors().Contains(b));
+            var cardBox = Box(card, w);
+            Near(18, cardBox.Left, "the conversation card's left gap");
+            Near(18, w.ClientSize.Width - cardBox.Right, "the conversation card's right gap");
+            foreach (var t in row.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible))
+                Assert.True(Box(t, w).Right <= cardBox.Right - 10 + 0.5, $"live text runs past the card at {width} wide");
+            AllInside(w, $"main window with live words at {width} wide");
+        }
+        Save(w, "main-live-420");
+    }
+
+    [AvaloniaFact]
     public void Main_window_without_a_text_area_card_is_still_even()
     {
         using var rig = UiTests.Rig.Make(typeEnabled: true);

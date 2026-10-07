@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace Assistant.Core;
 
-public enum EngineEventKind { Turn, SuggestStart, Chunk, SuggestEnd, Status, Error, RegionChanged, ModeChanged, Recovered, Usage, Hearing }
+public enum EngineEventKind { Turn, SuggestStart, Chunk, SuggestEnd, Status, Error, RegionChanged, ModeChanged, Recovered, Usage, Hearing, Live }
 
 public sealed record EngineEvent(
     EngineEventKind Kind, string? Text = null, Speaker? Speaker = null, Region? Region = null);
@@ -114,6 +114,33 @@ public sealed class Engine : IDisposable
     /// <summary>Someone is speaking right now (on the speakers, or into the microphone if it is on).</summary>
     public bool IsHearingSpeech { get { lock (_gate) return !Paused && _speaking.Count > 0; } }
 
+    private readonly Dictionary<Speaker, string> _liveText = new();
+
+    /// <summary>The words of what <paramref name="who"/> is saying right now, as far as they are known (a preview that the real
+    /// transcript replaces), or null.</summary>
+    public string? LiveText(Speaker who) { lock (_gate) return _liveText.GetValueOrDefault(who); }
+
+    /// <summary>Who is speaking right now, if anyone: the other person when both are.</summary>
+    public Speaker? HearingWho
+    {
+        get { lock (_gate) return Paused || _speaking.Count == 0 ? null : _speaking.Contains(Speaker.Them) ? Speaker.Them : Speaker.Me; }
+    }
+
+    /// <summary>Show the words so far of what someone is saying (null or empty: nothing to show). Called by the audio side.</summary>
+    public void SetLive(Speaker who, string? text)
+    {
+        text = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+        bool changed;
+        lock (_gate)
+        {
+            if (Paused) text = null;
+            var old = _liveText.GetValueOrDefault(who);
+            changed = old != text;
+            if (text is null) _liveText.Remove(who); else _liveText[who] = text;
+        }
+        if (changed) Emit(new EngineEvent(EngineEventKind.Live, text, who));
+    }
+
     /// <summary>Called by the audio side when a person starts or stops speaking.</summary>
     public void SetSpeaking(Speaker who, bool speaking)
     {
@@ -157,6 +184,7 @@ public sealed class Engine : IDisposable
             if (paused)
             {
                 _speaking.Clear();
+                _liveText.Clear();
                 _clearEpoch++;                    // the cancelled run must not hand its debt to the next one
                 _runCts?.Cancel();
                 _deadline = null;
@@ -168,6 +196,7 @@ public sealed class Engine : IDisposable
         ReconcileWatcher();
         Emit(new EngineEvent(EngineEventKind.ModeChanged));
         Emit(new EngineEvent(EngineEventKind.Hearing)); // the "listening" display follows recording
+        if (paused) Emit(new EngineEvent(EngineEventKind.Live));
     }
 
     /// <summary>TYPE on/off. Off ignores the region entirely; the region itself is kept for when it's switched back on.</summary>
