@@ -246,7 +246,8 @@ public class PromptTests
         Assert.Contains("the SAY options answer it directly and briefly", Prompting.SystemPrompt);
         Assert.Contains("Don't dodge a question by asking it back", Prompting.SystemPrompt);
         Assert.Contains("whatever the Length setting says", Prompting.SystemPrompt);   // the answer is not squeezed by "brief"
-        Assert.Contains("ANSWER\n• the thorough answer", Prompting.SystemPrompt);
+        // The prompt is a raw string literal, so on a Windows checkout its line breaks are CR LF.
+        Assert.Contains("ANSWER\n• the thorough answer", Prompting.SystemPrompt.Replace("\r\n", "\n"));
     }
 
     [Fact]
