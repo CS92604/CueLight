@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-from reply_copilot.config import Config
-from reply_copilot.conversation import Conversation
-from reply_copilot.suggest import FALLBACK_BETA, Suggester, build_user_content
+from claude_live_conversation_assistant.config import Config
+from claude_live_conversation_assistant.conversation import Conversation
+from claude_live_conversation_assistant.suggest import FALLBACK_BETA, Suggester, build_user_content
 
 
 def test_user_content_text_only():

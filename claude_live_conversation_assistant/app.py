@@ -13,7 +13,7 @@ from .suggest import Suggester
 
 def parse_args(argv: list[str] | None = None) -> tuple[Config, argparse.Namespace]:
     p = argparse.ArgumentParser(
-        prog="reply_copilot",
+        prog="claude_live_conversation_assistant",
         description="Listen to your PC's audio, transcribe it locally, and get Claude-suggested replies.",
     )
     d = Config()

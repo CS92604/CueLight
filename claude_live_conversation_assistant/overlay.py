@@ -19,7 +19,7 @@ class Overlay:
     def __init__(self, engine: Engine, cfg: Config, events: "queue.Queue[tuple[str, object]]") -> None:
         self.engine, self.cfg, self.events = engine, cfg, events
         self.root = root = tk.Tk()
-        root.title("Reply Copilot")
+        root.title("Claude Live Conversation Assistant")
         root.geometry("460x520+40+40")
         root.configure(bg=BG)
         root.attributes("-topmost", True)

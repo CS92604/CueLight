@@ -1,8 +1,8 @@
 import threading
 import time
 
-from reply_copilot.config import Config
-from reply_copilot.engine import Engine
+from claude_live_conversation_assistant.config import Config
+from claude_live_conversation_assistant.engine import Engine
 
 
 class FakeSuggester:

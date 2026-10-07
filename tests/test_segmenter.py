@@ -1,6 +1,6 @@
 import numpy as np
 
-from reply_copilot.audio import SAMPLE_RATE, Segmenter
+from claude_live_conversation_assistant.audio import SAMPLE_RATE, Segmenter
 
 
 def tone(seconds: float, amp: float = 0.2, freq: float = 220.0) -> np.ndarray:

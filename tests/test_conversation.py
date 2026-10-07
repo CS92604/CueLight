@@ -1,4 +1,4 @@
-from reply_copilot.conversation import Conversation
+from claude_live_conversation_assistant.conversation import Conversation
 
 
 def test_render_labels_and_merges_same_speaker():

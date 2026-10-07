@@ -7,10 +7,10 @@ from dataclasses import dataclass
 @dataclass
 class Config:
     # Claude
-    model: str = os.environ.get("COPILOT_MODEL", "claude-opus-5-5")
-    effort: str = os.environ.get("COPILOT_EFFORT", "low")  # low | medium | high | xhigh | max
+    model: str = os.environ.get("LIVE_ASSISTANT_MODEL", "claude-opus-5-5")
+    effort: str = os.environ.get("LIVE_ASSISTANT_EFFORT", "low")  # low | medium | high | xhigh | max
     max_tokens: int = 2048  # thinking tokens count toward this
-    fallbacks: bool = os.environ.get("COPILOT_FALLBACKS", "1") != "0"
+    fallbacks: bool = os.environ.get("LIVE_ASSISTANT_FALLBACKS", "1") != "0"
 
     # What the user wants help with ("I'm in a job interview for ...")
     context: str = ""

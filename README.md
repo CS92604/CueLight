@@ -1,4 +1,4 @@
-# Reply Copilot
+# claude-live-conversation-assistant
 
 Listens to the audio playing on your PC (the other people on a call), transcribes it
 locally, and uses Claude to suggest natural things for you to say next. It can also
@@ -19,7 +19,7 @@ transcribed on your machine.
 python -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...              # Windows: setx ANTHROPIC_API_KEY ...
-python -m reply_copilot --context "I'm on a call with a recruiter about a backend role"
+python -m claude_live_conversation_assistant --context "I'm on a call with a recruiter about a backend role"
 ```
 
 The first run downloads the Whisper model (~150 MB for `base.en`).
@@ -30,12 +30,12 @@ The first run downloads the Whisper model (~150 MB for `base.en`).
 | Linux | Works out of the box (PulseAudio / PipeWire monitor of the default output). |
 | macOS | Needs a virtual device such as [BlackHole](https://github.com/ExistentialAudio/BlackHole). Route output through it (Multi-Output Device) and run with `--loopback-device BlackHole`. |
 
-Run `python -m reply_copilot --list-devices` to see what's available.
+Run `python -m claude_live_conversation_assistant --list-devices` to see what's available.
 
 ## Usage
 
 ```
-python -m reply_copilot [options]
+python -m claude_live_conversation_assistant [options]
 
 --context "..."        who you are / what the conversation is about (the single biggest quality lever)
 --context-file FILE    same, from a file (paste a job description, your notes, ...)
@@ -65,7 +65,7 @@ without any audio setup.
   speaker finish. For faster responses use a smaller model (`--model claude-haiku-4-5`).
 - **Refusals.** For models that support it, the request includes the server-side
   `fallbacks: "default"` parameter so a safety-classifier decline is retried on a fallback
-  model automatically. `--no-fallbacks` or `COPILOT_FALLBACKS=0` turns that off.
+  model automatically. `--no-fallbacks` or `LIVE_ASSISTANT_FALLBACKS=0` turns that off.
 - **Windows silence quirk.** WASAPI loopback can stop delivering audio while nothing is
   playing; if the transcript stalls after a long silence, play any sound.
 - **Accuracy.** Speech-to-text makes mistakes, and Claude is told not to invent facts or
