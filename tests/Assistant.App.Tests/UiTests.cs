@@ -53,6 +53,14 @@ sealed class NoWatcher : IScreenWatcher
     public void Dispose() { }
 }
 
+/// <summary>Pretends the OS can hide windows from screen capture, for the duration of a test.</summary>
+sealed class CaptureSupportStub : IDisposable
+{
+    private readonly Func<bool> _old = Assistant.App.Platform.CaptureShield.SupportCheck;
+    public CaptureSupportStub(bool supported) => Assistant.App.Platform.CaptureShield.SupportCheck = () => supported;
+    public void Dispose() => Assistant.App.Platform.CaptureShield.SupportCheck = _old;
+}
+
 public class UiTests
 {
     static readonly string ShotDir = Environment.GetEnvironmentVariable("SCREENSHOT_DIR")
@@ -69,18 +77,21 @@ public class UiTests
         public MainViewModel Vm = null!;
         public MainWindow Window = null!;
         public readonly List<string> Copied = new();
+        public readonly List<bool> Recording = new();
         public Settings Settings = new();
 
         public Func<Task> PickRegion = () => Task.CompletedTask;
 
-        public static Rig Make(string reply = BothReply)
+        public static Rig Make(string reply = BothReply, bool typeEnabled = true)
         {
             var r = new Rig();
             r.Suggester.Text = reply;
+            r.Settings.TypeEnabled = typeEnabled;
             r.Engine = new Engine(new EngineOptions { Debounce = TimeSpan.FromMilliseconds(30) }, r.Suggester, new FakeCapture(), (_, _, _) => new NoWatcher());
+            r.Engine.SetTextEnabled(typeEnabled);
             r.Engine.Start();
             r.Vm = new MainViewModel(r.Engine, r.Settings, t => { r.Copied.Add(t); return Task.CompletedTask; },
-                () => r.PickRegion(), () => { }, () => { }, () => { });
+                () => r.PickRegion(), () => { }, () => { }, () => { }, on => r.Recording.Add(on));
             r.Window = new MainWindow { DataContext = r.Vm, Width = 440, Height = 780 };
             r.Window.Show();
             return r;
@@ -243,6 +254,175 @@ public class UiTests
     }
 
     [AvaloniaFact]
+    public void Recording_off_pauses_everything_and_says_so()
+    {
+        using var rig = Rig.Make();
+        rig.Engine.SetRegion(new Region(700, 120, 420, 160));
+        rig.Vm.SetListening();
+        rig.Engine.AddTurn(Speaker.Them, "Hey, can you start on Monday morning at nine?");
+        Pump(() => rig.Vm.Sections.Count == 2 && rig.Vm.IsListening);
+        Assert.True(rig.Vm.IsRecording);
+        Assert.Equal("Listening", rig.Vm.StatusLine);
+
+        rig.Vm.IsRecording = false;
+        Assert.True(rig.Engine.Paused);
+        Assert.False(rig.Engine.IsWatching);
+        Assert.Equal(new[] { false }, rig.Recording);
+        Assert.Equal(MainViewModel.PausedText, rig.Vm.StatusLine);
+        Assert.False(rig.Vm.IsListening);
+        Shot(rig.Window, "main-paused-light");
+        Theme(ThemeVariant.Dark);
+        Shot(rig.Window, "main-paused-dark");
+        Theme(ThemeVariant.Light);
+
+        // The buttons do nothing while it's off.
+        int calls = rig.Suggester.Calls.Count;
+        rig.Vm.Hint = "shorter";
+        rig.Vm.SuggestCommand.Execute(null);
+        rig.Vm.PanicCommand.Execute(null);
+        rig.Vm.RegenerateCommand.Execute(null);
+        rig.Engine.AddTurn(Speaker.Them, "And are you able to bring your laptop along too?");
+        Thread.Sleep(250);
+        Assert.Equal(calls, rig.Suggester.Calls.Count);
+
+        rig.Vm.IsRecording = true;
+        Assert.False(rig.Engine.Paused);
+        Assert.True(rig.Engine.IsWatching);
+        Assert.Equal(new[] { false, true }, rig.Recording);
+        Assert.Equal("Listening", rig.Vm.StatusLine);
+        Assert.True(rig.Vm.IsListening);
+    }
+
+    [AvaloniaFact]
+    public void Pausing_mid_reply_drops_the_cut_off_options()
+    {
+        using var rig = Rig.Make();
+        rig.Suggester.HoldAfterFirstChunk = new ManualResetEventSlim();
+        rig.Engine.AddTurn(Speaker.Them, "Can you walk me through your last project please?");
+        Pump(() => rig.Vm.Sections.Count > 0 && rig.Vm.IsThinking);
+        rig.Vm.IsRecording = false;
+        Assert.False(rig.Vm.HasSections);
+        Assert.Equal(StatusKind.Listening, rig.Vm.Status);       // not stuck on "Thinking…" when it comes back
+        rig.Suggester.HoldAfterFirstChunk.Set();
+    }
+
+    [AvaloniaFact]
+    public void Type_off_shows_only_say_and_hides_the_text_area_and_panic()
+    {
+        using var rig = Rig.Make(typeEnabled: false);
+        rig.Vm.SetListening();
+        Shot(rig.Window, "main-type-off-light");
+        Assert.False(rig.Vm.TypeEnabled);
+        Assert.False(rig.Engine.TextEnabled);
+        Assert.Contains("as people talk.", rig.Vm.EmptyHint);
+
+        rig.Engine.AddTurn(Speaker.Them, "Hey, can you start on Monday morning at nine?");
+        Pump(() => rig.Vm.Sections.Count > 0 && rig.Vm.IsListening);
+        Assert.Equal(new[] { SectionKind.Say }, rig.Vm.Sections.Select(x => x.Kind));   // the reply had a TYPE part; it's not shown
+        Assert.Null(rig.Suggester.Calls[0].RegionPng);
+
+        rig.Vm.PanicCommand.Execute(null);
+        Thread.Sleep(200);
+        Assert.Single(rig.Suggester.Calls);                       // Panic is a no-op with Type off
+
+        // Turning Type on brings the TYPE part of the same reply back, and saves the choice.
+        rig.Vm.TypeEnabled = true;
+        Assert.True(rig.Settings.TypeEnabled);
+        Assert.True(rig.Engine.TextEnabled);
+        Assert.Equal(new[] { SectionKind.Say, SectionKind.Type }, rig.Vm.Sections.Select(x => x.Kind));
+        Assert.Contains("text area changes", rig.Vm.EmptyHint);
+    }
+
+    [AvaloniaFact]
+    public void Type_on_without_an_area_offers_to_select_one()
+    {
+        using var rig = Rig.Make(typeEnabled: false);
+        rig.Vm.SetListening();
+        rig.Vm.TypeEnabled = true;
+        Assert.False(rig.Vm.HasRegion);
+        Assert.Contains("Select the exact area", rig.Vm.RegionText);
+        Shot(rig.Window, "main-type-on-light");
+        Theme(ThemeVariant.Dark);
+        Shot(rig.Window, "main-type-on-dark");
+        Theme(ThemeVariant.Light);
+    }
+
+    [AvaloniaFact]
+    public void Capture_shield_flags_every_tracked_window_including_ones_opened_later()
+    {
+        var flagged = new List<(Window W, bool Hidden)>();
+        var (oldApply, oldSupport) = (Platform.CaptureShield.Apply, Platform.CaptureShield.SupportCheck);
+        Platform.CaptureShield.Apply = (w, hidden) => { flagged.Add((w, hidden)); return true; };
+        Platform.CaptureShield.SupportCheck = () => true;
+        try
+        {
+            var a = new Window();
+            Platform.CaptureShield.Track(a);
+            a.Show();
+            Assert.Empty(flagged);                                 // off by default: nothing is touched
+
+            Assert.True(Platform.CaptureShield.SetHidden(true));
+            Assert.Contains((a, true), flagged);
+
+            var b = new Window();                                  // e.g. the area picker, opened afterwards
+            Platform.CaptureShield.Track(b);
+            b.Show();
+            Assert.Contains((b, true), flagged);
+
+            flagged.Clear();
+            Assert.True(Platform.CaptureShield.SetHidden(false));
+            Assert.Contains((a, false), flagged);
+            Assert.Contains((b, false), flagged);
+
+            b.Close();
+            flagged.Clear();
+            Platform.CaptureShield.SetHidden(true);
+            Assert.DoesNotContain(flagged, f => ReferenceEquals(f.W, b));  // closed windows are forgotten
+            a.Close();
+        }
+        finally
+        {
+            Platform.CaptureShield.SetHidden(false);
+            (Platform.CaptureShield.Apply, Platform.CaptureShield.SupportCheck) = (oldApply, oldSupport);
+        }
+    }
+
+    [AvaloniaFact]
+    public void Capture_shield_refuses_where_the_os_cannot_do_it()
+    {
+        var oldSupport = Platform.CaptureShield.SupportCheck;
+        Platform.CaptureShield.SupportCheck = () => false;
+        try
+        {
+            Assert.False(Platform.CaptureShield.SetHidden(true));
+            Assert.False(Platform.CaptureShield.IsHidden);
+            var vm = new SettingsViewModel(new Settings(), () => { }, new KeyEntryViewModel(), null, _ => { });
+            Assert.False(vm.HideSupported);
+            vm.HideFromCapture = true;
+            Assert.False(vm.HideFromCapture);
+        }
+        finally { Platform.CaptureShield.SupportCheck = oldSupport; }
+    }
+
+    [AvaloniaFact]
+    public void Hide_from_capture_setting_is_saved_when_supported()
+    {
+        var oldSupport = Platform.CaptureShield.SupportCheck;
+        Platform.CaptureShield.SupportCheck = () => true;
+        try
+        {
+            var settings = new Settings();
+            int changes = 0;
+            var vm = new SettingsViewModel(settings, () => changes++, new KeyEntryViewModel(), null, _ => { });
+            vm.HideFromCapture = true;
+            Assert.True(settings.HideFromCapture);
+            Assert.True(vm.HideFromCapture);
+            Assert.Equal(1, changes);
+        }
+        finally { Platform.CaptureShield.SupportCheck = oldSupport; }
+    }
+
+    [AvaloniaFact]
     public void Clear_chat_empties_everything()
     {
         using var rig = Rig.Make();
@@ -257,6 +437,7 @@ public class UiTests
     [AvaloniaFact]
     public void Settings_window_edits_apply_to_settings()
     {
+        using var supported = new CaptureSupportStub(true);
         var settings = new Settings();
         int changes = 0;
         var entry = new KeyEntryViewModel(_ => Task.FromResult((true, "")));
@@ -267,6 +448,9 @@ public class UiTests
         Theme(ThemeVariant.Dark);
         Shot(win, "settings-dark");
         Theme(ThemeVariant.Light);
+        win.FindControl<ScrollViewer>("Scroller")!.ScrollToEnd();
+        Shot(win, "settings-bottom-light");
+        win.FindControl<ScrollViewer>("Scroller")!.ScrollToHome();
 
         vm.ProfessionalismIndex = 3;
         vm.ProficiencyIndex = 0;

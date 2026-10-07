@@ -11,7 +11,7 @@ public enum StatusKind { Idle, Listening, Thinking, Preparing, Error }
 public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
     private const int MaxTurnsShown = 40;
-    public const string NoRegionText = "Pick a chat or doc for Claude to read when it changes";
+    public const string NoRegionText = "Select the exact area to watch: a chat, email or document";
 
     private readonly Engine _engine;
     private readonly Settings _settings;
@@ -20,10 +20,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly Action _openSettings;
     private readonly Action _settingsChanged;
     private readonly Action _retrySpeech;
+    private readonly Action<bool>? _recordingChanged;
     private string _raw = "";
 
+    public const string PausedText = "Recording is off. Nothing is being heard, watched or sent.";
+
     public MainViewModel(Engine engine, Settings settings, Func<string, Task> copy, Func<Task> pickRegion,
-        Action openSettings, Action settingsChanged, Action retrySpeech)
+        Action openSettings, Action settingsChanged, Action retrySpeech, Action<bool>? recordingChanged = null)
     {
         _engine = engine;
         _settings = settings;
@@ -32,6 +35,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _openSettings = openSettings;
         _settingsChanged = settingsChanged;
         _retrySpeech = retrySpeech;
+        _recordingChanged = recordingChanged;
+        _typeEnabled = settings.TypeEnabled;
         _autoSuggest = settings.AutoSuggest;
         _pinOnTop = settings.AlwaysOnTop;
         _handler = e => Dispatcher.UIThread.Post(() => Handle(e));
@@ -55,18 +60,61 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _hint = "";
     [ObservableProperty] private bool _autoSuggest;
     [ObservableProperty] private bool _pinOnTop;
+    [ObservableProperty] private bool _isRecording = true;
+    [ObservableProperty] private bool _typeEnabled;
 
     public bool HasTurns => Turns.Count > 0;
     public bool HasSections => Sections.Count > 0;
-    public bool IsListening => Status == StatusKind.Listening;
-    public bool IsThinking => Status == StatusKind.Thinking || Status == StatusKind.Preparing;
-    public bool IsError => Status == StatusKind.Error;
 
-    partial void OnStatusChanged(StatusKind value)
+    public string EmptyHint => TypeEnabled
+        ? "Suggestions will appear here as people talk or your text area changes."
+        : "Suggestions will appear here as people talk.";
+
+    // What the status area shows. While recording is off it says so and goes quiet, whatever the
+    // speech model or Claude last reported; that comes back when recording does.
+    public string StatusLine => IsRecording ? StatusText : PausedText;
+    public bool IsListening => IsRecording && Status == StatusKind.Listening;
+    public bool IsThinking => IsRecording && (Status == StatusKind.Thinking || Status == StatusKind.Preparing);
+    public bool IsError => IsRecording && Status == StatusKind.Error;
+    public bool ProgressVisible => IsRecording && ShowProgress;
+    public bool RetryVisible => IsRecording && CanRetry;
+
+    private void RaiseStatusProperties()
     {
+        OnPropertyChanged(nameof(StatusLine));
         OnPropertyChanged(nameof(IsListening));
         OnPropertyChanged(nameof(IsThinking));
         OnPropertyChanged(nameof(IsError));
+        OnPropertyChanged(nameof(ProgressVisible));
+        OnPropertyChanged(nameof(RetryVisible));
+    }
+
+    partial void OnStatusChanged(StatusKind value) => RaiseStatusProperties();
+    partial void OnStatusTextChanged(string value) => OnPropertyChanged(nameof(StatusLine));
+    partial void OnShowProgressChanged(bool value) => OnPropertyChanged(nameof(ProgressVisible));
+    partial void OnCanRetryChanged(bool value) => OnPropertyChanged(nameof(RetryVisible));
+
+    partial void OnIsRecordingChanged(bool value)
+    {
+        _engine.SetPaused(!value);
+        if (!value && Status == StatusKind.Thinking)
+        {
+            // A reply that was cut off mid-way isn't worth keeping (its options can't be trusted).
+            Sections.Clear();
+            OnPropertyChanged(nameof(HasSections));
+            SetListening();
+        }
+        RaiseStatusProperties();
+        _recordingChanged?.Invoke(value);
+    }
+
+    partial void OnTypeEnabledChanged(bool value)
+    {
+        _settings.TypeEnabled = value;
+        OnPropertyChanged(nameof(EmptyHint));
+        _engine.SetTextEnabled(value);
+        Render(final: !IsThinking); // TYPE replies come and go with the switch
+        _settingsChanged();
     }
 
     partial void OnAutoSuggestChanged(bool value)
@@ -153,7 +201,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void Render(bool final)
     {
-        var parsed = SuggestionParser.Parse(_raw);
+        var parsed = SuggestionParser.Parse(_raw).Where(sec => TypeEnabled || sec.Kind != SectionKind.Type).ToList();
         Sections.Clear();
         for (int s = 0; s < parsed.Count; s++)
         {
@@ -169,6 +217,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Suggest()
     {
+        if (!IsRecording) return;
         var hint = Hint.Trim();
         Hint = "";
         _engine.Request(Trigger.None, hint.Length > 0 ? hint : null);
@@ -178,6 +227,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task Panic()
     {
+        if (!IsRecording || !TypeEnabled) return;
         if (_engine.Region is null)
         {
             await _pickRegion();
@@ -190,6 +240,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Regenerate()
     {
+        if (!IsRecording) return;
         var hint = Hint.Trim();
         Hint = "";
         _engine.Regenerate(hint.Length > 0 ? hint : null);

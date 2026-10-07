@@ -106,6 +106,23 @@
           </ListBox>
         </StackPanel>
 
+        <!-- Privacy -->
+        <StackPanel Spacing="10">
+          <TextBlock Classes="eyebrow" Text="PRIVACY" />
+          <Border Classes="card">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="2">
+                <TextBlock Text="Hide from screen sharing" FontWeight="SemiBold" />
+                <TextBlock Classes="muted small" TextWrapping="Wrap"
+                           Text="Keeps this app's windows out of screen shares, recordings and screenshots, so people on a call don't see them. A camera pointed at your screen still can." />
+                <TextBlock Classes="small" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" IsVisible="{Binding !HideSupported}"
+                           Text="Not available on this PC (needs Windows 10 version 2004 or later)." />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding HideFromCapture}" IsEnabled="{Binding HideSupported}" OnContent="" OffContent="" Margin="12,0,0,0" />
+            </Grid>
+          </Border>
+        </StackPanel>
+
         <!-- Listening -->
         <StackPanel Spacing="10">
           <TextBlock Classes="eyebrow" Text="LISTENING" />

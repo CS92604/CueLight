@@ -434,4 +434,153 @@ public class EngineTests : IDisposable
         Assert.Equal(Trigger.Manual, sug.Calls[1].Trigger);
         Assert.Null(sug.Calls[1].Rejected);
     }
+
+    // -- Recording off / Type off -----------------------------------------------------------
+
+    [Fact]
+    public void While_paused_nothing_triggers_and_nothing_is_sent()
+    {
+        var (eng, sug, rec) = Make(withRegion: true);
+        eng.SetPaused(true);
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");   // a late transcript still lands in the chat...
+        eng.OnScreenChanged();
+        eng.Request();
+        eng.Request(Trigger.Speech, hint: "x");
+        Assert.False(eng.Panic());
+        eng.Regenerate();
+        Thread.Sleep(300);
+        Assert.Empty(sug.Calls);                                                    // ...but never reaches Claude
+        Assert.Contains("Can you tell me", eng.Conversation.Render(1000));
+        Assert.Contains(rec.Events, e => e.Kind == EngineEventKind.Status && e.Text!.Contains("Recording is off"));
+    }
+
+    [Fact]
+    public void Pausing_stops_the_watcher_and_resuming_starts_a_fresh_one_on_the_same_region()
+    {
+        var (eng, _, rec) = Make(withRegion: true);
+        var first = FakeWatcher.Instances[^1];
+        Assert.True(eng.IsWatching);
+        eng.SetPaused(true);
+        Assert.True(first.Disposed);
+        Assert.False(eng.IsWatching);
+        Assert.Equal(Area, eng.Region);                      // the selection survives
+        eng.SetPaused(false);
+        var second = FakeWatcher.Instances[^1];
+        Assert.NotSame(first, second);
+        Assert.True(second.Started);
+        Assert.True(eng.IsWatching);
+        Assert.Equal(2, rec.Events.Count(e => e.Kind == EngineEventKind.ModeChanged));
+    }
+
+    [Fact]
+    public void Pausing_cancels_a_reply_in_flight_and_resuming_does_not_resurrect_it()
+    {
+        var gate = new ManualResetEventSlim();
+        var (eng, sug, rec) = Make(o => o.Debounce = TimeSpan.Zero, new FakeSuggester { Gate = gate }, withRegion: true);
+        eng.AddTurn(Speaker.Them, "Hey, are you still there with us on the call?");
+        Assert.True(sug.FirstChunkSent.Wait(3000));
+        eng.SetPaused(true);
+        gate.Set();
+        Thread.Sleep(300);
+        eng.SetPaused(false);
+        Thread.Sleep(400);
+        Assert.Single(sug.Calls);                            // the interrupted request isn't retried on resume
+        Assert.Equal(0, rec.Count(EngineEventKind.SuggestEnd));
+    }
+
+    [Fact]
+    public void Pausing_drops_what_was_waiting_to_be_sent()
+    {
+        var (eng, sug, _) = Make(o => o.Debounce = TimeSpan.FromMilliseconds(300), withRegion: true);
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");
+        eng.SetPaused(true);
+        Thread.Sleep(600);
+        eng.SetPaused(false);
+        Thread.Sleep(400);
+        Assert.Empty(sug.Calls);
+    }
+
+    [Fact]
+    public void Requests_work_again_after_resuming()
+    {
+        var (eng, sug, rec) = Make(o => o.Debounce = TimeSpan.Zero, withRegion: true);
+        eng.SetPaused(true);
+        eng.SetPaused(false);
+        eng.AddTurn(Speaker.Them, "Can you tell me about your last project?");
+        rec.WaitFor(EngineEventKind.SuggestEnd);
+        Assert.Single(sug.Calls);
+    }
+
+    [Fact]
+    public void With_type_off_the_region_is_not_watched_or_sent()
+    {
+        var (eng, sug, rec) = Make(o => { o.AutoSuggest = false; }, withRegion: true);
+        var watcher = FakeWatcher.Instances[^1];
+        eng.SetTextEnabled(false);
+        Assert.True(watcher.Disposed);
+        Assert.False(eng.IsWatching);
+        Assert.Equal(Area, eng.Region);                      // kept for when Type comes back on
+        eng.Request();
+        rec.WaitFor(EngineEventKind.SuggestEnd);
+        Assert.Null(sug.Calls[0].RegionPng);
+        Assert.Equal(Trigger.Manual, sug.Calls[0].Trigger);
+    }
+
+    [Fact]
+    public void With_type_off_a_region_picked_later_is_remembered_but_not_watched()
+    {
+        var (eng, _, _) = Make();
+        eng.SetTextEnabled(false);
+        eng.SetRegion(Area);
+        Assert.Empty(FakeWatcher.Instances);
+        eng.SetTextEnabled(true);
+        Assert.True(Assert.Single(FakeWatcher.Instances).Started);
+    }
+
+    [Fact]
+    public void With_type_off_screen_changes_and_panic_do_nothing()
+    {
+        var (eng, sug, rec) = Make(o => o.Debounce = TimeSpan.Zero, withRegion: true);
+        eng.SetTextEnabled(false);
+        eng.OnScreenChanged();
+        Assert.False(eng.Panic());
+        Thread.Sleep(250);
+        Assert.Empty(sug.Calls);
+        Assert.Contains(rec.Events, e => e.Kind == EngineEventKind.Status && e.Text!.Contains("Type on"));
+    }
+
+    [Fact]
+    public void Turning_type_back_on_makes_panic_work_again()
+    {
+        var (eng, sug, rec) = Make(o => o.AutoSuggest = false, withRegion: true);
+        eng.SetTextEnabled(false);
+        eng.SetTextEnabled(true);
+        Assert.True(eng.Panic());
+        rec.WaitFor(EngineEventKind.SuggestEnd);
+        Assert.NotNull(sug.Calls[0].RegionPng);
+    }
+
+    [Fact]
+    public void Turning_type_off_drops_a_pending_text_trigger_but_keeps_speech()
+    {
+        var (eng, sug, rec) = Make(o => o.Debounce = TimeSpan.FromMilliseconds(300), withRegion: true);
+        eng.AddTurn(Speaker.Them, "Did you get my message about the schedule?");
+        eng.OnScreenChanged();                               // both are waiting out the debounce
+        eng.SetTextEnabled(false);
+        rec.WaitFor(EngineEventKind.SuggestEnd, timeoutMs: 3000);
+        Thread.Sleep(300);
+        var call = Assert.Single(sug.Calls);
+        Assert.Equal(Trigger.Speech, call.Trigger);
+        Assert.Null(call.RegionPng);
+    }
+
+    [Fact]
+    public void Turning_type_off_cancels_a_lone_pending_text_trigger()
+    {
+        var (eng, sug, _) = Make(o => o.Debounce = TimeSpan.FromMilliseconds(300), withRegion: true);
+        eng.OnScreenChanged();
+        eng.SetTextEnabled(false);
+        Thread.Sleep(700);
+        Assert.Empty(sug.Calls);
+    }
 }

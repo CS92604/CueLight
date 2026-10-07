@@ -27,10 +27,30 @@
       </Button>
     </Grid>
 
+    <!-- Switches -->
+    <Grid DockPanel.Dock="Top" Margin="18,0,18,10" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+      <ToggleButton Classes="pill rec" IsChecked="{Binding IsRecording}"
+                    ToolTip.Tip="Recording. On: listens to your speakers and watches the text area. Off: nothing is heard, watched or sent.">
+        <StackPanel Orientation="Horizontal" Spacing="7">
+          <Ellipse Classes="pilldot" Width="8" Height="8" VerticalAlignment="Center" />
+          <TextBlock Text="Recording" Foreground="{Binding $parent[ToggleButton].Foreground}" />
+          <TextBlock Text="{Binding IsRecording, Converter={x:Static vm:Converters.OnOff}}" FontWeight="Bold" Foreground="{Binding $parent[ToggleButton].Foreground}" />
+        </StackPanel>
+      </ToggleButton>
+      <ToggleButton Grid.Column="1" Classes="pill" IsChecked="{Binding TypeEnabled}"
+                    ToolTip.Tip="Type. On: also reads a text area you select (a chat, email or document) and suggests what to type. Off: only listens to the conversation.">
+        <StackPanel Orientation="Horizontal" Spacing="7">
+          <Path Data="{StaticResource IconScan}" Stroke="{Binding $parent[ToggleButton].Foreground}" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" Width="13" Height="13" Stretch="Uniform" />
+          <TextBlock Text="Type" Foreground="{Binding $parent[ToggleButton].Foreground}" />
+          <TextBlock Text="{Binding TypeEnabled, Converter={x:Static vm:Converters.OnOff}}" FontWeight="Bold" Foreground="{Binding $parent[ToggleButton].Foreground}" />
+        </StackPanel>
+      </ToggleButton>
+    </Grid>
+
     <!-- Composer -->
     <Border DockPanel.Dock="Bottom" Padding="18,8,18,14" Background="{DynamicResource Bg}">
       <StackPanel Spacing="8">
-        <Border Classes="card" Padding="14,5,6,5" CornerRadius="22" BoxShadow="0 2 14 0 #14000000">
+        <Border Classes="card composer" Padding="14,5,6,5" CornerRadius="22" BoxShadow="0 2 14 0 #14000000" IsEnabled="{Binding IsRecording}">
           <Grid ColumnDefinitions="*,Auto">
             <TextBox Classes="bare" Text="{Binding Hint}" Watermark="Ask for a different angle, e.g. “shorter”" VerticalAlignment="Center">
               <TextBox.KeyBindings>
@@ -45,6 +65,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4">
           <ToggleSwitch IsChecked="{Binding AutoSuggest}" OnContent="Auto-suggest" OffContent="Auto-suggest" FontSize="12" />
           <Button Grid.Column="2" Classes="panic" Command="{Binding PanicCommand}" VerticalAlignment="Center"
+                  IsVisible="{Binding TypeEnabled}" IsEnabled="{Binding IsRecording}"
                   ToolTip.Tip="Panic: re-read the text area right now and give me a reply">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <Path Data="{StaticResource IconBolt}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" Width="14" Height="14" Stretch="Uniform" />
@@ -63,10 +84,10 @@
         <StackPanel Spacing="8" Margin="4,0,4,0">
           <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9">
             <Ellipse Classes="dot" Classes.listening="{Binding IsListening}" Classes.busy="{Binding IsThinking}" Classes.error="{Binding IsError}" VerticalAlignment="Top" Margin="0,5,0,0" />
-            <TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" LineHeight="18" />
-            <Button Grid.Column="2" Classes="ghost" Content="Retry" Command="{Binding RetrySpeechCommand}" IsVisible="{Binding CanRetry}" Padding="10,3" />
+            <TextBlock Grid.Column="1" Text="{Binding StatusLine}" Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" LineHeight="18" />
+            <Button Grid.Column="2" Classes="ghost" Content="Retry" Command="{Binding RetrySpeechCommand}" IsVisible="{Binding RetryVisible}" Padding="10,3" />
           </Grid>
-          <ProgressBar Classes="thin" Value="{Binding Progress}" Minimum="0" Maximum="100" IsVisible="{Binding ShowProgress}" />
+          <ProgressBar Classes="thin" Value="{Binding Progress}" Minimum="0" Maximum="100" IsVisible="{Binding ProgressVisible}" />
         </StackPanel>
 
         <!-- Conversation -->
@@ -91,13 +112,13 @@
         </Border>
 
         <!-- Text area -->
-        <Border Classes="card" Padding="14,12">
+        <Border Classes="card" Padding="14,12" IsVisible="{Binding TypeEnabled}">
           <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
             <Border Width="36" Height="36" CornerRadius="10" Background="{DynamicResource SurfaceAlt}" VerticalAlignment="Center">
               <Path Data="{StaticResource IconScan}" Stroke="{DynamicResource TextMuted}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round" Width="18" Height="18" Stretch="Uniform" />
             </Border>
             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
-              <TextBlock Text="Text area" FontWeight="SemiBold" />
+              <TextBlock Text="Text area to watch" FontWeight="SemiBold" />
               <TextBlock Text="{Binding RegionText}" Classes="muted small" TextWrapping="Wrap" />
             </StackPanel>
             <Button Grid.Column="2" Classes="secondary" Content="{Binding HasRegion, Converter={x:Static vm:Converters.SelectLabel}}" Command="{Binding SelectRegionCommand}" VerticalAlignment="Center" />
@@ -111,7 +132,7 @@
         <StackPanel Spacing="12">
           <Grid ColumnDefinitions="*,Auto" Margin="4,4,0,0">
             <TextBlock Classes="eyebrow" Text="SUGGESTIONS" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Classes="ghost" Command="{Binding RegenerateCommand}" IsVisible="{Binding HasSections}"
+            <Button Grid.Column="1" Classes="ghost" Command="{Binding RegenerateCommand}" IsVisible="{Binding HasSections}" IsEnabled="{Binding IsRecording}"
                     ToolTip.Tip="Redo this reply with a different take. Type a direction below first, like “shorter”.">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <Path Data="{StaticResource IconRefresh}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.9" StrokeLineCap="Round" StrokeJoin="Round" Width="13" Height="13" Stretch="Uniform" />
@@ -121,7 +142,7 @@
           </Grid>
           <Border IsVisible="{Binding !HasSections}" Padding="4,6">
             <TextBlock Classes="title muted" FontStyle="Italic" FontSize="19" TextWrapping="Wrap" LineHeight="28" Foreground="{DynamicResource TextFaint}"
-                       Text="Suggestions will appear here as people talk or your text area changes." />
+                       Text="{Binding EmptyHint}" />
           </Border>
           <ItemsControl ItemsSource="{Binding Sections}">
             <ItemsControl.ItemTemplate>

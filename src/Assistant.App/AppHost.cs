@@ -26,6 +26,7 @@ public sealed class AppHost : IDisposable
     private SpeechAccuracy _loadedAccuracy;
     private bool _speechStarted;
     private Action<EngineEvent>? _regionHandler;
+    private bool _hiddenFromCapture;
 
     public AppHost()
     {
@@ -37,6 +38,11 @@ public sealed class AppHost : IDisposable
         {
             Settings = Settings,
         };
+        Engine.SetTextEnabled(Settings.TypeEnabled);
+
+        // Windows are flagged as they open, so this has to be decided before the first one is shown.
+        if (Settings.HideFromCapture && !CaptureShield.SetHidden(true)) Settings.HideFromCapture = false;
+        _hiddenFromCapture = Settings.HideFromCapture;
         _saveTimer = new Timer(_ => _store.Save(Settings), null, Timeout.Infinite, Timeout.Infinite);
     }
 
@@ -65,7 +71,8 @@ public sealed class AppHost : IDisposable
     public MainWindow CreateMainWindow()
     {
         _vm?.Dispose();
-        _vm = new MainViewModel(Engine, Settings, CopyAsync, PickRegionAsync, OpenSettings, ApplySettings, () => LoadSpeech(force: true));
+        _vm = new MainViewModel(Engine, Settings, CopyAsync, PickRegionAsync, OpenSettings, ApplySettings,
+            () => LoadSpeech(force: true), SetRecording);
         _window = new MainWindow { DataContext = _vm };
         _window.Opened += (_, _) =>
         {
@@ -76,8 +83,8 @@ public sealed class AppHost : IDisposable
         if (_regionHandler is not null) Engine.Event -= _regionHandler;
         _regionHandler = e =>
         {
-            if (e.Kind == EngineEventKind.RegionChanged)
-                Dispatcher.UIThread.Post(() => ShowOutline(e.Region));
+            if (e.Kind is EngineEventKind.RegionChanged or EngineEventKind.ModeChanged)
+                Dispatcher.UIThread.Post(() => ShowOutline(Engine.IsWatching ? Engine.Region : null));
         };
         Engine.Event += _regionHandler;
         return _window;
@@ -95,6 +102,13 @@ public sealed class AppHost : IDisposable
 
     private void StartListening()
     {
+        StartAudio();
+        LoadSpeech(force: false);
+    }
+
+    private void StartAudio()
+    {
+        if (_pipeline is not null) return;
         _pipeline = new AudioPipeline(Engine, Task.FromResult<ISpeechToText>(_speech));
         if (!OperatingSystem.IsWindows())
         {
@@ -104,16 +118,27 @@ public sealed class AppHost : IDisposable
         _pipeline.Add(Speaker.Them, new WasapiAudioSource(loopback: true));
         _pipeline.Start();
         if (Settings.UseMicrophone) AttachMic();
-        LoadSpeech(force: false);
+    }
+
+    /// <summary>Release the audio devices (so Windows' own "microphone in use" indicator goes off too).</summary>
+    private void StopAudio()
+    {
+        _pipeline?.Dispose();
+        _pipeline = null;
+        _mic = null;
+    }
+
+    /// <summary>The Recording switch: off stops listening altogether, on starts again.</summary>
+    private void SetRecording(bool on)
+    {
+        if (on) StartAudio(); else StopAudio();
     }
 
     /// <summary>Stop listening and watching (used when the key is removed and the welcome screen returns).</summary>
     private void StopSession()
     {
         _modelCts?.Cancel();
-        _pipeline?.Dispose();
-        _pipeline = null;
-        _mic = null;
+        StopAudio();
         _speechStarted = false;
         Engine.SetRegion(null);
         Engine.ClearConversation();
@@ -169,6 +194,15 @@ public sealed class AppHost : IDisposable
         Engine.Settings = Settings.Normalized();
         Engine.Options.AutoSuggest = Settings.AutoSuggest;
         if (Settings.UseMicrophone) AttachMic(); else DetachMic();
+        if (Settings.HideFromCapture != _hiddenFromCapture)
+        {
+            if (CaptureShield.SetHidden(Settings.HideFromCapture)) _hiddenFromCapture = Settings.HideFromCapture;
+            else
+            {
+                Settings.HideFromCapture = _hiddenFromCapture;
+                _vm?.SetProblem("Couldn't hide the windows from screen capture on this PC.");
+            }
+        }
         if (_speechStarted && _loadedAccuracy != Settings.SpeechAccuracy) LoadSpeech(force: true);
         _saveTimer.Change(400, Timeout.Infinite); // debounce: typing in a field changes settings per keystroke
     }

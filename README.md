@@ -24,19 +24,29 @@ choose **More info → Run anyway**.
 
 ## Using it
 
-- **It always listens** to what your speakers play (the other people on the call) and
-  transcribes it on your PC. After someone finishes speaking you get up to a few options to
-  **say**, each with a **Copy** button.
-- **Select** a text area to watch a chat window, email or document: the screen freezes like
-  the Snipping Tool and you drag a box over the text. A thin orange outline stays around it
-  (just outside, so it's never in what Claude sees). When the text changes and stops
-  changing, Claude reads it and suggests what to **type**. Keep the assistant window off the box.
-- **Both at once:** if someone is talking *and* the text area updates, you get a Say section
-  and a Type section together, consistent with each other.
-- **Panic** forces Claude to read the text area *right now* and answer it: no waiting for a
-  change, no settle delay, works even with Auto-suggest off. It also gives you something to say
-  if the last thing spoken needs an answer. With no text area picked yet, it asks you to draw
-  one first.
+Two switches sit at the top of the window.
+
+- **Recording ON / OFF.** On, the app listens to what your speakers play (the other people on the
+  call) and transcribes it on your PC. Off, it does nothing: the audio devices are released, the
+  text area isn't watched, nothing is sent to Claude, and the buttons are disabled until you turn
+  it back on. Whatever was already transcribed stays on screen.
+- **Type ON / OFF.** Off (the default), the app only listens to the conversation and gives you
+  things to **say**. Turn it on and a **Text area to watch** card appears with a **Select area**
+  button: the screen freezes like the Snipping Tool and you drag a box over the chat, email or
+  document. A thin orange outline stays around it (just outside, so it's never in what Claude
+  sees). When the text changes and stops changing, Claude reads it and suggests what to **type**.
+  Keep the assistant window off the box. Switching Type off stops watching but remembers the box.
+
+Then:
+
+- After someone finishes speaking you get up to a few options to **say**, each with a **Copy**
+  button.
+- **Both at once:** with Type on, if someone is talking *and* the text area updates, you get a Say
+  section and a Type section together, consistent with each other.
+- **Panic** (shown when Type is on) forces Claude to read the text area *right now* and answer
+  it: no waiting for a change, no settle delay, works even with Auto-suggest off. It also gives
+  you something to say if the last thing spoken needs an answer. With no text area picked yet, it
+  asks you to draw one first.
 - **Regenerate** (above the suggestions) redoes the current reply. Claude is shown the replies
   you threw away and told to take a different angle, so you don't just get a reword. It uses your
   current settings, so change Tone or Length first if you want. Type a direction in the box
@@ -63,6 +73,7 @@ screen as it is now.
 | Reply language | Empty = match the other person |
 | About me / extra instructions | Free text: who you are, words to avoid… |
 | Claude model | Opus 5.5 (best replies) · Sonnet 5.5 (faster, cheaper) · Haiku 4.5 (fastest) |
+| Hide from screen sharing | Keeps every window of the app out of screen shares, recordings and screenshots. Windows 10 version 2004 or later. Off by default; see Privacy below. |
 | Microphone | Also transcribe your own voice, so Claude knows what you've said. Use headphones. |
 | Speech recognition | Fast · Balanced · Accurate (downloads a different model) |
 
@@ -92,7 +103,15 @@ ships in `src/Assistant.App/Assets/Fonts`). To use different fonts, change the t
   experiences about you. Check anything factual before you say or send it.
 - Recording or transcribing other people can require their consent where you live, and many
   employers, schools and interviewers prohibit live AI help. Check the rules for your
-  situation. The window doesn't hide itself from screen sharing.
+  situation.
+- **Hide from screen sharing** (Settings → Privacy, off by default) uses the Windows setting that
+  apps like password managers use, so Teams, Zoom, Meet, OBS, the Snipping Tool and similar
+  capture software don't see the app's windows, including the picker and the orange outline.
+  It doesn't hide anything from a camera pointed at your screen, a capture card, or anyone
+  looking at your monitor, and the app's taskbar button can still show up if your whole screen
+  is shared. It's for keeping your notes and other people's messages private, not for getting
+  around someone who has asked you not to use AI help. It also means your own screenshots of the
+  app come out blank.
 
 ## Build from source
 
@@ -114,4 +133,4 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Assistant.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
 | `src/Assistant.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 95 core tests (including the real SDK against a local fake server) and 17 headless UI tests that render the windows and drive the area picker with simulated input. |
+| `tests/` | 106 core tests (including the real SDK against a local fake server) and 24 headless UI tests that render the windows and drive the area picker with simulated input. |

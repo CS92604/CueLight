@@ -24,6 +24,8 @@
           <SolidColorBrush x:Key="InfoSoft" Color="#E8EEF4" />
           <SolidColorBrush x:Key="InfoText" Color="#3E5A78" />
           <SolidColorBrush x:Key="Success" Color="#5B8F62" />
+          <SolidColorBrush x:Key="SuccessSoft" Color="#E5EFE3" />
+          <SolidColorBrush x:Key="SuccessText" Color="#3B6B44" />
           <SolidColorBrush x:Key="Danger" Color="#C4452F" />
           <SolidColorBrush x:Key="DangerSoft" Color="#FBE9E5" />
         </ResourceDictionary>
@@ -46,6 +48,8 @@
           <SolidColorBrush x:Key="InfoSoft" Color="#34404D" />
           <SolidColorBrush x:Key="InfoText" Color="#A8C1DA" />
           <SolidColorBrush x:Key="Success" Color="#7DB284" />
+          <SolidColorBrush x:Key="SuccessSoft" Color="#2F3D32" />
+          <SolidColorBrush x:Key="SuccessText" Color="#A9D4AF" />
           <SolidColorBrush x:Key="Danger" Color="#E5705B" />
           <SolidColorBrush x:Key="DangerSoft" Color="#4A302B" />
         </ResourceDictionary>
@@ -191,6 +195,15 @@
     <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
   </Style>
+  <Style Selector="Button.ghost:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+  </Style>
+  <Style Selector="Button.panic:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
   <Style Selector="Button.ghost.done">
     <Setter Property="Foreground" Value="{DynamicResource Success}" />
   </Style>
@@ -216,6 +229,54 @@
     <Setter Property="Background" Value="{DynamicResource AccentSoftHover}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AccentPressed}" />
     <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+
+  <!-- Pill switches (Recording, Type): quiet when off, tinted when on. -->
+  <Style Selector="ToggleButton.pill">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="ToggleButton.pill:checked">
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+  <Style Selector="ToggleButton.pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+  </Style>
+  <Style Selector="ToggleButton.pill:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="ToggleButton.pill:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoftHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="ToggleButton.rec:checked">
+    <Setter Property="Foreground" Value="{DynamicResource SuccessText}" />
+  </Style>
+  <Style Selector="ToggleButton.rec:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Success}" />
+  </Style>
+  <Style Selector="ToggleButton.rec:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Success}" />
+  </Style>
+  <Style Selector="ToggleButton Ellipse.pilldot">
+    <Setter Property="Fill" Value="{DynamicResource TextFaint}" />
+  </Style>
+  <Style Selector="ToggleButton.rec:checked Ellipse.pilldot">
+    <Setter Property="Fill" Value="{DynamicResource Success}" />
+  </Style>
+  <Style Selector="Border.composer:disabled">
+    <Setter Property="Opacity" Value="0.5" />
   </Style>
 
   <Style Selector="Button.icon">

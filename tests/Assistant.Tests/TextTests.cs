@@ -202,6 +202,8 @@ public class PromptTests
     public void Manual_lists_the_available_channels()
     {
         Assert.Contains("<changed>spoken</changed>", Text(Trigger.Manual));
+        Assert.Contains("what to SAY only", Text(Trigger.Manual));                    // no text area: nothing to TYPE
+        Assert.Contains("SAY and/or TYPE", Text(Trigger.Manual, new byte[] { 1 }));
         Assert.Contains("<changed>spoken, written</changed>", Text(Trigger.Manual, new byte[] { 1 }));
     }
 

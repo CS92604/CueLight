@@ -132,6 +132,7 @@ public static class RegionPicker
             PointerMoved += OnMoved;
             PointerReleased += OnReleased;
             KeyDown += (_, e) => { if (e.Key == Key.Escape) _done(null); };
+            Platform.CaptureShield.Track(this);
             Opened += (_, _) => Focus();
         }
 
@@ -222,6 +223,7 @@ public sealed class RegionOutline : IDisposable
                 MinWidth = 0,
                 MinHeight = 0,
             };
+            Platform.CaptureShield.Track(bar);
             bar.Show();
             _bars.Add(bar);
         }

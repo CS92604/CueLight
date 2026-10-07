@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace Assistant.Core;
 
-public enum EngineEventKind { Turn, SuggestStart, Chunk, SuggestEnd, Status, Error, RegionChanged }
+public enum EngineEventKind { Turn, SuggestStart, Chunk, SuggestEnd, Status, Error, RegionChanged, ModeChanged }
 
 public sealed record EngineEvent(
     EngineEventKind Kind, string? Text = null, Speaker? Speaker = null, Region? Region = null);
@@ -31,6 +31,9 @@ public sealed class EngineOptions
 /// and the channels that triggered are merged, so if speech and on-screen text change together
 /// Claude is asked for both a SAY and a TYPE reply.
 ///
+/// Two switches gate everything: <see cref="Paused"/> (recording off: nothing is watched and nothing
+/// is sent) and <see cref="TextEnabled"/> (TYPE off: the region is ignored and only speech is used).
+///
 /// Each request carries the full transcript but only the current picture of the watched region;
 /// earlier pictures are never kept or resent. <see cref="Panic"/> forces an immediate re-read of
 /// the region, and <see cref="Regenerate"/> redoes the last reply with a different take.
@@ -57,6 +60,7 @@ public sealed class Engine : IDisposable
     private double _queuedAt;
     private CancellationTokenSource? _runCts;
     private int _clearEpoch;
+    private readonly object _watcherLock = new();
     private IScreenWatcher? _watcher;
     private Task? _loop;
 
@@ -75,6 +79,15 @@ public sealed class Engine : IDisposable
     public Conversation Conversation { get; } = new();
     public Region? Region { get; private set; }
 
+    /// <summary>Recording is off: nothing is watched, nothing triggers, nothing is sent.</summary>
+    public bool Paused { get; private set; }
+
+    /// <summary>TYPE is on: the selected region is watched and included in requests.</summary>
+    public bool TextEnabled { get; private set; } = true;
+
+    /// <summary>True while the screen region is actually being polled.</summary>
+    public bool IsWatching => Region is not null && TextEnabled && !Paused;
+
     /// <summary>Raised from background threads; marshal to the UI thread before touching controls.</summary>
     public event Action<EngineEvent>? Event;
 
@@ -87,12 +100,59 @@ public sealed class Engine : IDisposable
 
     public void SetRegion(Region? region)
     {
-        IScreenWatcher? old;
-        lock (_gate) { old = _watcher; _watcher = null; Region = region; }
-        old?.Dispose();
+        lock (_gate) Region = region;
         Emit(new EngineEvent(EngineEventKind.RegionChanged, Region: region));
-        if (region is { } r)
+        ReconcileWatcher();
+    }
+
+    /// <summary>Recording on/off. Pausing cancels anything in flight, drops anything pending and stops watching.</summary>
+    public void SetPaused(bool paused)
+    {
+        lock (_gate)
         {
+            if (Paused == paused) return;
+            Paused = paused;
+            if (paused)
+            {
+                _clearEpoch++;                    // the cancelled run must not hand its debt to the next one
+                _runCts?.Cancel();
+                _deadline = null;
+                _kinds = Trigger.None;
+                _hint = null;
+                _immediate = _redo = false;
+            }
+        }
+        ReconcileWatcher();
+        Emit(new EngineEvent(EngineEventKind.ModeChanged));
+    }
+
+    /// <summary>TYPE on/off. Off ignores the region entirely; the region itself is kept for when it's switched back on.</summary>
+    public void SetTextEnabled(bool enabled)
+    {
+        lock (_gate)
+        {
+            if (TextEnabled == enabled) return;
+            TextEnabled = enabled;
+            if (!enabled)
+            {
+                _kinds &= ~(Trigger.Text | Trigger.Forced);
+                if (_kinds == Trigger.None) { _deadline = null; _hint = null; _immediate = _redo = false; }
+            }
+        }
+        ReconcileWatcher();
+        Emit(new EngineEvent(EngineEventKind.ModeChanged));
+    }
+
+    /// <summary>Make the running watcher match what should be watched right now.</summary>
+    private void ReconcileWatcher()
+    {
+        lock (_watcherLock)
+        {
+            IScreenWatcher? old;
+            Region? wanted;
+            lock (_gate) { old = _watcher; _watcher = null; wanted = IsWatching ? Region : null; }
+            old?.Dispose();
+            if (wanted is not { } r) return;
             var watcher = _watcherFactory(r, OnScreenChanged, msg => Emit(new EngineEvent(EngineEventKind.Error, msg)));
             lock (_gate) _watcher = watcher;
             watcher.Start();
@@ -104,7 +164,7 @@ public sealed class Engine : IDisposable
 
     public void OnScreenChanged()
     {
-        if (Options.AutoSuggest && Region is not null) Request(Trigger.Text, delay: Options.Debounce);
+        if (Options.AutoSuggest && IsWatching) Request(Trigger.Text, delay: Options.Debounce);
     }
 
     // -- inputs -----------------------------------------------------------------------------
@@ -126,6 +186,7 @@ public sealed class Engine : IDisposable
     {
         lock (_gate)
         {
+            if (Paused) return;
             _runCts?.Cancel(); // supersedes anything in flight
             _kinds |= kinds == Trigger.None ? Trigger.Manual : kinds;
             if (_deadline is null) _queuedAt = Now;
@@ -143,6 +204,16 @@ public sealed class Engine : IDisposable
     /// </summary>
     public bool Panic(string? hint = null)
     {
+        if (Paused)
+        {
+            Emit(new EngineEvent(EngineEventKind.Status, "Recording is off. Turn it on to use Panic."));
+            return false;
+        }
+        if (!TextEnabled)
+        {
+            Emit(new EngineEvent(EngineEventKind.Status, "Turn Type on and pick a text area, then Panic can read it."));
+            return false;
+        }
         if (Region is null)
         {
             Emit(new EngineEvent(EngineEventKind.Status, "Pick a text area first, then Panic can read it."));
@@ -161,6 +232,7 @@ public sealed class Engine : IDisposable
     {
         lock (_gate)
         {
+            if (Paused) return;
             _runCts?.Cancel();
             // Cancelling takes effect inside this lock, so a stale chunk can't overwrite the reset below.
             if (_lastReply.Length > 0 && !_lastReply.StartsWith('('))
@@ -255,7 +327,7 @@ public sealed class Engine : IDisposable
         Emit(new EngineEvent(EngineEventKind.SuggestStart, redo ? "Trying another take…"
             : kinds.HasFlag(Trigger.Forced) ? "Reading the text area…" : null));
         byte[]? png = null;
-        if (Region is { } region && kinds != Trigger.Speech)
+        if (Region is { } region && TextEnabled && kinds != Trigger.Speech)
         {
             // Spoken-only triggers skip the image; any other trigger includes what's on screen now.
             try { png = _capture.CapturePng(region); }
@@ -307,6 +379,6 @@ public sealed class Engine : IDisposable
     {
         _stop.Cancel();
         _signal.Release();
-        _watcher?.Dispose();
+        lock (_watcherLock) _watcher?.Dispose();
     }
 }

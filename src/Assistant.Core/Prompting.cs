@@ -79,11 +79,11 @@ public static class Prompting
         if (r.Rejected is { Count: > 0 })
             parts.Add("<rejected_suggestions>\n" + string.Join("\n---\n", r.Rejected) + "\n</rejected_suggestions>");
         parts.Add($"<changed>{string.Join(", ", changed)}</changed>");
-        parts.Add(TaskLine(r.Trigger) + (r.Hint is { Length: > 0 } ? $"\nExtra direction from me: {r.Hint}" : ""));
+        parts.Add(TaskLine(r.Trigger, r.RegionPng is not null) + (r.Hint is { Length: > 0 } ? $"\nExtra direction from me: {r.Hint}" : ""));
         return string.Join("\n\n", parts);
     }
 
-    private static string TaskLine(Trigger t)
+    private static string TaskLine(Trigger t, bool hasImage)
     {
         if (t.HasFlag(Trigger.Forced))
             return "I pressed the panic button because I need to reply right now. Read the attached region of my screen as it is at this moment, find the newest message not written by me, and give me what to TYPE. If the last thing said out loud also needs an answer, give me what to SAY too.";
@@ -93,7 +93,9 @@ public static class Prompting
             Trigger.Speech => "Something new was just said out loud. Give me what to SAY.",
             Trigger.Text => "The written text in the attached region just changed. Give me what to TYPE.",
             (Trigger.Speech | Trigger.Text) => "Both the spoken conversation and the written text just changed. Give me what to SAY and what to TYPE.",
-            _ => "I asked for suggestions. Give me SAY and/or TYPE, whichever have something to reply to.",
+            _ => hasImage
+                ? "I asked for suggestions. Give me SAY and/or TYPE, whichever have something to reply to."
+                : "I asked for suggestions. No text area is being watched, so give me what to SAY only.",
         };
     }
 }

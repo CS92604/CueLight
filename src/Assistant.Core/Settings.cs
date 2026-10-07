@@ -28,6 +28,11 @@ public sealed class Settings
     public bool UseMicrophone { get; set; }
     public bool AutoSuggest { get; set; } = true;
     public bool AlwaysOnTop { get; set; } = true;
+    /// <summary>TYPE side on: a text area is selected and watched, and replies to it are suggested.
+    /// Off means the app only listens to the conversation (SAY).</summary>
+    public bool TypeEnabled { get; set; }
+    /// <summary>Windows only: keep every window of the app out of screen captures and screen shares.</summary>
+    public bool HideFromCapture { get; set; }
     public SpeechAccuracy SpeechAccuracy { get; set; } = SpeechAccuracy.Balanced;
 
     public Settings Clone() => (Settings)MemberwiseClone();

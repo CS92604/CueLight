@@ -69,6 +69,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     public string CustomInstructions { get => _s.CustomInstructions; set { _s.CustomInstructions = value ?? ""; Changed(nameof(CustomInstructions)); } }
     public bool UseMicrophone { get => _s.UseMicrophone; set { _s.UseMicrophone = value; Changed(nameof(UseMicrophone)); } }
 
+    /// <summary>Whether this PC can keep windows out of screen capture (Windows 10 version 2004+).</summary>
+    public bool HideSupported => Platform.CaptureShield.IsSupported;
+    public bool HideFromCapture
+    {
+        get => _s.HideFromCapture && HideSupported;
+        set { _s.HideFromCapture = value && HideSupported; Changed(nameof(HideFromCapture)); }
+    }
+
     public ModelChoice? SelectedModel
     {
         get => Models.All.FirstOrDefault(m => m.Id == _s.Model);
