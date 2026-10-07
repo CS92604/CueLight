@@ -48,7 +48,10 @@
           <SolidColorBrush x:Key="DangerSoft" Color="#4A302B" />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
-      <FontFamily x:Key="SerifFont">Georgia, Cambria, 'Times New Roman', serif</FontFamily>
+      <!-- Claude sets its writing in a serif and its interface in a sans. Source Serif 4 (SIL OFL) and
+           Inter are bundled as open stand-ins, so the look is the same on every PC. -->
+      <FontFamily x:Key="SerifFont">avares://ClaudeLiveAssistant/Assets/Fonts#Source Serif 4</FontFamily>
+      <FontFamily x:Key="SerifDisplayFont">avares://ClaudeLiveAssistant/Assets/Fonts#Source Serif 4 Display</FontFamily>
     </ResourceDictionary>
   </Styles.Resources>
 
@@ -64,13 +67,19 @@
 
   <!-- Typography -->
   <Style Selector="TextBlock.display">
-    <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
-    <Setter Property="FontSize" Value="30" />
+    <Setter Property="FontFamily" Value="{StaticResource SerifDisplayFont}" />
+    <Setter Property="FontSize" Value="34" />
     <Setter Property="FontWeight" Value="Normal" />
   </Style>
   <Style Selector="TextBlock.title">
     <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
-    <Setter Property="FontSize" Value="18" />
+    <Setter Property="FontSize" Value="20" />
+  </Style>
+  <!-- Claude's own words (the suggestions) are set in the serif, as in Claude's chat. -->
+  <Style Selector="TextBlock.reply">
+    <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="LineHeight" Value="24" />
   </Style>
   <Style Selector="TextBlock.section">
     <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
@@ -251,6 +260,11 @@
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="BorderThickness" Value="1.5" />
+  </Style>
+  <Style Selector="TextBox">
+    <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="SelectionForegroundBrush" Value="{DynamicResource Text}" />
+    <Setter Property="CaretBrush" Value="{DynamicResource Accent}" />
   </Style>
   <Style Selector="TextBox.bare">
     <Setter Property="Background" Value="Transparent" />

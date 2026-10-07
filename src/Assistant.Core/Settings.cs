@@ -13,7 +13,7 @@ public enum SpeechAccuracy { Fast, Balanced, Accurate }
 public sealed class Settings
 {
     public Professionalism Professionalism { get; set; } = Professionalism.Professional;
-    /// <summary>How advanced the wording is, so the user can say it comfortably.</summary>
+    /// <summary>How much jargon to use and how deeply to explain things.</summary>
     public Proficiency Proficiency { get; set; } = Proficiency.Fluent;
     public Tone Tone { get; set; } = Tone.Warm;
     public ReplyLength Length { get; set; } = ReplyLength.Short;
@@ -54,7 +54,7 @@ public sealed class Settings
         var lines = new List<string>
         {
             $"- Formality: {Describe(s.Professionalism)}",
-            $"- My language proficiency (write wording I can say comfortably): {Describe(s.Proficiency)}",
+            $"- Jargon and depth of explanation: {Describe(s.Proficiency)}",
             $"- Tone: {Describe(s.Tone)}",
             $"- Length: {Describe(s.Length)}",
             $"- Options: up to {s.Options} per section",
@@ -74,10 +74,19 @@ public sealed class Settings
 
     public static string Describe(Proficiency v) => v switch
     {
-        Proficiency.Simple => "simple English at about CEFR B1: common words, short sentences, easy to say out loud; avoid idioms and long words",
-        Proficiency.Everyday => "everyday conversational English at about CEFR B2: clear and natural, occasional idiom, no rare vocabulary",
-        Proficiency.Fluent => "fluent, native-like English at about CEFR C1: natural idioms and varied sentence structure",
-        _ => "highly articulate English at about CEFR C2: rich vocabulary and precise, polished phrasing",
+        Proficiency.Simple => "plain language with no jargon. Use everyday words, define any unavoidable term in a few words, and explain things simply and from the ground up, as if to a newcomer to the topic",
+        Proficiency.Everyday => "mostly plain language with only common, widely known terms. Briefly explain anything technical, with short, practical explanations",
+        Proficiency.Fluent => "normal professional vocabulary for the topic. Use standard field terminology without defining it, assume shared background, and explain at a working level of detail",
+        _ => "specialist level. Use precise technical terminology and jargon freely, skip the basics, and go into depth where it matters: mechanisms, trade-offs and specifics. (This is about depth and vocabulary, not length)",
+    };
+
+    /// <summary>One line shown under the Proficiency control in Settings.</summary>
+    public static string Caption(Proficiency v) => v switch
+    {
+        Proficiency.Simple => "Plain words, no jargon. Explains things from the ground up.",
+        Proficiency.Everyday => "Mostly plain words. A few common terms, briefly explained.",
+        Proficiency.Fluent => "Normal professional vocabulary. Assumes shared background.",
+        _ => "Specialist jargon and depth. Skips the basics.",
     };
 
     public static string Describe(Tone v) => v switch

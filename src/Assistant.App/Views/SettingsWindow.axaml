@@ -63,7 +63,8 @@
           <StackPanel Spacing="6">
             <TextBlock Text="Proficiency" FontWeight="SemiBold" />
             <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.ProficiencyItems}" SelectedIndex="{Binding ProficiencyIndex}" />
-            <TextBlock Classes="muted small" TextWrapping="Wrap" Text="How advanced the wording is. Pick what you can say comfortably, so replies don't need words you'd stumble on." />
+            <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{Binding ProficiencyCaption}" />
+            <TextBlock Classes="faint small" TextWrapping="Wrap" Text="How much jargon replies use and how deeply they explain things." />
           </StackPanel>
           <StackPanel Spacing="6">
             <TextBlock Text="Tone" FontWeight="SemiBold" />

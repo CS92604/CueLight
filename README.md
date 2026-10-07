@@ -42,7 +42,7 @@ choose **More info → Run anyway**.
 | | |
 |---|---|
 | Professionalism | Very casual · Casual · Professional · Formal |
-| Proficiency | How advanced the *wording* is, so you can say it comfortably: Simple · Everyday · Fluent · Advanced |
+| Proficiency | How much jargon replies use and how deeply they explain things: **Simple** (plain words, explained from the ground up) · **Everyday** (a few common terms, briefly explained) · **Fluent** (normal professional vocabulary, shared background assumed) · **Advanced** (specialist jargon and depth, basics skipped). It never makes Claude claim expertise you haven't stated. |
 | Tone | Warm · Neutral · Direct · Diplomatic · Confident |
 | Length / options | Brief · Short · Detailed; 1–3 options per section |
 | Reply language | Empty = match the other person |
@@ -54,6 +54,16 @@ choose **More info → Run anyway**.
 Changes are saved as you make them and apply to the next suggestion.
 
 <p align="center"><img src="docs/settings-light.png" width="320" alt="Settings"></p>
+
+## Look and feel
+
+The interface follows Claude's own: warm off-white (or charcoal in dark mode), a clay-orange
+accent, Claude's words (the suggestions) set in a serif and the interface in a sans.
+Claude's own typefaces are proprietary, so the app bundles open stand-ins:
+[Source Serif 4](https://github.com/adobe-fonts/source-serif) for the serif and
+[Inter](https://rsms.me/inter/) for the sans (both SIL Open Font License; the license text
+ships in `src/Assistant.App/Assets/Fonts`). To use different fonts, change the two
+`FontFamily` entries at the top of `src/Assistant.App/Styles/Theme.axaml`.
 
 ## Privacy and responsible use
 

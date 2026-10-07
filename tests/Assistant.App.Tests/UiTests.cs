@@ -213,6 +213,7 @@ public class UiTests
 
         vm.ProfessionalismIndex = 3;
         vm.ProficiencyIndex = 0;
+        Assert.Equal(Settings.Caption(Proficiency.Simple), vm.ProficiencyCaption);
         vm.ToneIndex = 2;
         vm.LengthIndex = 0;
         vm.OptionsIndex = 2;

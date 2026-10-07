@@ -50,7 +50,18 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     public int ProfessionalismIndex { get => (int)_s.Professionalism; set { if (value < 0) return; _s.Professionalism = (Professionalism)value; Changed(nameof(ProfessionalismIndex)); } }
-    public int ProficiencyIndex { get => (int)_s.Proficiency; set { if (value < 0) return; _s.Proficiency = (Proficiency)value; Changed(nameof(ProficiencyIndex)); } }
+    public int ProficiencyIndex
+    {
+        get => (int)_s.Proficiency;
+        set
+        {
+            if (value < 0) return;
+            _s.Proficiency = (Proficiency)value;
+            OnPropertyChanged(nameof(ProficiencyCaption));
+            Changed(nameof(ProficiencyIndex));
+        }
+    }
+    public string ProficiencyCaption => Settings.Caption(_s.Proficiency);
     public int ToneIndex { get => (int)_s.Tone; set { if (value < 0) return; _s.Tone = (Tone)value; Changed(nameof(ToneIndex)); } }
     public int LengthIndex { get => (int)_s.Length; set { if (value < 0) return; _s.Length = (ReplyLength)value; Changed(nameof(LengthIndex)); } }
     public int OptionsIndex { get => _s.Options - 1; set { if (value < 0) return; _s.Options = value + 1; Changed(nameof(OptionsIndex)); } }
