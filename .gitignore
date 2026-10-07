@@ -1,6 +1,7 @@
-__pycache__/
-*.pyc
-.venv/
-venv/
-.pytest_cache/
-.env
+bin/
+obj/
+publish/
+*.user
+.vs/
+screenshots/
+TestResults/

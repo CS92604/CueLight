@@ -1,0 +1,137 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Assistant.App.ViewModels"
+        xmlns:core="using:Assistant.Core"
+        x:Class="Assistant.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Settings"
+        Icon="avares://ClaudeLiveAssistant/Assets/app.png"
+        Width="480" Height="760" MinWidth="420" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="PreferSystemChrome"
+        ExtendClientAreaTitleBarHeightHint="-1">
+  <DockPanel>
+    <Grid x:Name="Header" DockPanel.Dock="Top" Height="54" Margin="24,0,0,0" Background="Transparent">
+      <TextBlock Classes="title" Text="Settings" VerticalAlignment="Center" IsHitTestVisible="False" />
+    </Grid>
+
+    <Border DockPanel.Dock="Bottom" Padding="22,12,22,16" Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="faint small" Text="Changes are saved as you make them." VerticalAlignment="Center" />
+        <Button Grid.Column="1" Classes="primary" Content="Done" Click="OnDone" Padding="22,9" />
+      </Grid>
+    </Border>
+
+    <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="22,4,22,28" Spacing="22">
+
+        <!-- API key -->
+        <StackPanel Spacing="10">
+          <TextBlock Classes="eyebrow" Text="CLAUDE API KEY" />
+          <Border Classes="card">
+            <StackPanel Spacing="12">
+              <Grid ColumnDefinitions="*,Auto,Auto" IsVisible="{Binding !IsEditingKey}" ColumnSpacing="6">
+                <TextBlock Text="{Binding MaskedKey}" FontFamily="Consolas, 'Cascadia Mono', Menlo, monospace" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="secondary" Content="Change" Command="{Binding ChangeKeyCommand}" Padding="12,6" />
+                <Button Grid.Column="2" Classes="ghost" Content="Remove" Command="{Binding RemoveKeyCommand}" IsVisible="{Binding HasKey}" />
+              </Grid>
+              <StackPanel Spacing="10" IsVisible="{Binding IsEditingKey}">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox Classes="field" Text="{Binding KeyEntry.Key}" PasswordChar="{Binding KeyEntry.PasswordChar}" Watermark="sk-ant-…" />
+                  <Button Grid.Column="1" Classes="icon" Command="{Binding KeyEntry.ToggleRevealCommand}" Margin="4,0,0,0" ToolTip.Tip="Show or hide the key">
+                    <Path Data="{StaticResource IconEye}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round" Width="17" Height="17" Stretch="Uniform" />
+                  </Button>
+                </Grid>
+                <TextBlock Text="{Binding KeyEntry.Error}" IsVisible="{Binding KeyEntry.HasError}" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" Classes="small" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="primary" Content="Check and save" Command="{Binding KeyEntry.SubmitCommand}" Padding="14,8" />
+                  <Button Classes="secondary" Content="Cancel" Command="{Binding CancelChangeKeyCommand}" Padding="14,8" />
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- Style -->
+        <StackPanel Spacing="14">
+          <TextBlock Classes="eyebrow" Text="HOW REPLIES SOUND" />
+          <StackPanel Spacing="6">
+            <TextBlock Text="Professionalism" FontWeight="SemiBold" />
+            <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.ProfessionalismItems}" SelectedIndex="{Binding ProfessionalismIndex}" />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock Text="Proficiency" FontWeight="SemiBold" />
+            <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.ProficiencyItems}" SelectedIndex="{Binding ProficiencyIndex}" />
+            <TextBlock Classes="muted small" TextWrapping="Wrap" Text="How advanced the wording is. Pick what you can say comfortably, so replies don't need words you'd stumble on." />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock Text="Tone" FontWeight="SemiBold" />
+            <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.ToneItems}" SelectedIndex="{Binding ToneIndex}" />
+          </StackPanel>
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
+            <StackPanel Spacing="6">
+              <TextBlock Text="Length" FontWeight="SemiBold" />
+              <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.LengthItems}" SelectedIndex="{Binding LengthIndex}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="6">
+              <TextBlock Text="Options per section" FontWeight="SemiBold" />
+              <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.OptionItems}" SelectedIndex="{Binding OptionsIndex}" />
+            </StackPanel>
+          </Grid>
+          <StackPanel Spacing="6">
+            <TextBlock Text="Reply language" FontWeight="SemiBold" />
+            <TextBox Classes="field" Text="{Binding ReplyLanguage}" Watermark="Same as the other person" />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock Text="About me and extra instructions" FontWeight="SemiBold" />
+            <TextBox Classes="field" Text="{Binding CustomInstructions}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="84"
+                     Watermark="e.g. “I’m interviewing for a junior analyst role.” or “Never use the word synergy.”" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Model -->
+        <StackPanel Spacing="10">
+          <TextBlock Classes="eyebrow" Text="CLAUDE MODEL" />
+          <ListBox Classes="choices" ItemsSource="{x:Static vm:SettingsViewModel.ModelItems}" SelectedItem="{Binding SelectedModel}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="core:ModelChoice">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                  <TextBlock Grid.Column="1" Text="{Binding Blurb}" Classes="muted small" VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </StackPanel>
+
+        <!-- Listening -->
+        <StackPanel Spacing="10">
+          <TextBlock Classes="eyebrow" Text="LISTENING" />
+          <Border Classes="card">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="2">
+                <TextBlock Text="Include my microphone" FontWeight="SemiBold" />
+                <TextBlock Classes="muted small" TextWrapping="Wrap" Text="So Claude knows what you've already said. Use headphones, or your mic will pick up the speakers too." />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseMicrophone}" OnContent="" OffContent="" Margin="12,0,0,0" />
+            </Grid>
+          </Border>
+          <TextBlock Text="Speech recognition" FontWeight="SemiBold" Margin="2,6,0,0" />
+          <ListBox Classes="choices" ItemsSource="{x:Static vm:SettingsViewModel.SpeechItems}" SelectedItem="{Binding SelectedSpeech}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SpeechChoice">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" MinWidth="64" />
+                  <TextBlock Grid.Column="1" Text="{Binding Blurb}" Classes="muted small" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBlock Classes="faint small" TextWrapping="Wrap" Text="Speech is recognised on this PC. The model downloads once; changing it later downloads the new one." />
+        </StackPanel>
+
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

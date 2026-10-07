@@ -1,125 +1,90 @@
-# claude-live-conversation-assistant
+# Claude Live Conversation Assistant
 
-Listens to whatever your PC's speakers are playing, watches a box you draw around any
-on-screen text (a chat window, an email, a doc), and uses Claude to tell you what to
-**say** and what to **type**, worded the way a real person would put it.
+A small Windows app that listens to whatever your PC is playing, watches a box you draw
+around any on-screen text, and uses Claude to tell you what to **say** and what to **type**,
+in words that sound like a person.
 
-```
-speakers ─► split into utterances ─► faster-whisper (local) ─┐
-                                                              ├─► Claude ─► SAY (out loud) + TYPE (paste)
-drag a box over any text ─► re-read when it changes ──────────┘
-your mic (optional, --mic) ─► "Me" in the transcript
-```
+<p align="center">
+  <img src="docs/main-suggestions-light.png" width="300" alt="Suggestions to say and type, with Copy buttons">
+  <img src="docs/main-suggestions-dark.png" width="300" alt="The same window in dark mode">
+</p>
 
-- **Spoken side:** system audio is transcribed locally; only text is sent to Claude.
-- **Written side:** you pick the area once; when its content changes (and stops changing),
-  Claude reads a screenshot of just that area. Nothing outside the box is ever captured.
-- **Both at once:** if someone is talking *and* the text area updates, you get a **SAY**
-  section and a **TYPE** section together, consistent with each other.
-- **Copy-paste ready:** every suggestion has a Copy button (or click the text).
+## Get started
 
-## Setup
+1. Download `ClaudeLiveAssistant-win-x64.zip` (from the latest [release](../../releases), or the
+   **Build** workflow's artifact), unzip it, and run `ClaudeLiveAssistant.exe`. Nothing to install.
+2. Paste your Claude API key ([get one here](https://console.anthropic.com/settings/keys)).
+   That's the only setup.
+3. The first launch downloads a speech model (about 140 MB, once). The status line shows progress.
 
-```bash
-python -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...              # Windows: setx ANTHROPIC_API_KEY ...
-python -m claude_live_conversation_assistant --context "I'm on a call with a recruiter about a backend role"
-```
+Windows may show a "protected your PC" prompt because the app isn't code-signed yet:
+choose **More info → Run anyway**.
 
-The first run downloads the Whisper model (~150 MB for `base.en`).
-
-| Platform | Notes |
-|---|---|
-| Windows | Works out of the box (WASAPI loopback for audio). |
-| Linux | Audio via PulseAudio/PipeWire monitor. Needs Tk (`sudo apt install python3-tk`) and an **X11** session: screen capture doesn't work under Wayland. |
-| macOS | Audio needs a virtual device such as [BlackHole](https://github.com/ExistentialAudio/BlackHole) (`--loopback-device BlackHole`). Grant your terminal *Screen Recording* permission for the text area. |
-
-`python -m claude_live_conversation_assistant --list-devices` shows audio devices.
+<p align="center"><img src="docs/welcome-light.png" width="300" alt="Welcome screen with the API key field"></p>
 
 ## Using it
 
-1. Start it. A small always-on-top window opens and begins listening.
-2. Click **Select text area**. The screen freezes like a snipping tool: drag a box over
-   the text you want watched. A red outline stays around it (drawn just outside the box,
-   so it never appears in what Claude sees). **Clear area** stops watching. Keep the
-   assistant window itself off the watched area.
-3. Talk or chat as normal. Suggestions appear on their own after a short pause:
-   - spoken words only → **SAY**
-   - watched text changed only → **TYPE**
-   - both → **SAY** and **TYPE**
-4. **Copy** puts one option on your clipboard. The box under the transcript takes a
-   direction ("shorter", "ask about the timeline"); press Enter or **Suggest** for a fresh set.
+- **It always listens** to what your speakers play (the other people on the call) and
+  transcribes it on your PC. After someone finishes speaking you get up to a few options to
+  **say**, each with a **Copy** button.
+- **Select** a text area to watch a chat window, email or document: the screen freezes like
+  the Snipping Tool and you drag a box over the text. A thin orange outline stays around it
+  (just outside, so it's never in what Claude sees). When the text changes and stops
+  changing, Claude reads it and suggests what to **type**. Keep the assistant window off the box.
+- **Both at once:** if someone is talking *and* the text area updates, you get a Say section
+  and a Type section together, consistent with each other.
+- Type a direction in the box at the bottom (“shorter”, “ask about the timeline”) and press
+  Enter for a fresh set. Turn **Auto-suggest** off to only get suggestions when you ask.
+- The pin keeps the window on top.
 
-"Changed" means a real change that has stopped moving for about a second, so a message
-that's still being typed isn't read half-finished, and a blinking cursor is ignored.
+## Settings
 
-## Settings (the **Settings** button)
-
-| Setting | What it does |
+| | |
 |---|---|
 | Professionalism | Very casual · Casual · Professional · Formal |
-| Proficiency | How advanced the *wording* is, so you can say it comfortably: Simple (~B1) · Everyday (~B2) · Fluent (~C1) · Advanced (~C2) |
+| Proficiency | How advanced the *wording* is, so you can say it comfortably: Simple · Everyday · Fluent · Advanced |
 | Tone | Warm · Neutral · Direct · Diplomatic · Confident |
-| Length | Brief · Short · Detailed |
-| Options per section | 1–3 |
+| Length / options | Brief · Short · Detailed; 1–3 options per section |
 | Reply language | Empty = match the other person |
-| Extra instructions | Free text: who you are, words to avoid, … |
+| About me / extra instructions | Free text: who you are, words to avoid… |
+| Claude model | Opus 5.5 (best replies) · Sonnet 5.5 (faster, cheaper) · Haiku 4.5 (fastest) |
+| Microphone | Also transcribe your own voice, so Claude knows what you've said. Use headphones. |
+| Speech recognition | Fast · Balanced · Accurate (downloads a different model) |
 
-Settings apply to the next suggestion and are saved to
-`~/.config/claude-live-conversation-assistant/settings.json` (`%APPDATA%\...` on Windows).
-Command-line flags override them for one run: `--professionalism Formal --proficiency Simple
---tone Direct --length Brief --options 3 --reply-language Spanish`.
+Changes are saved as you make them and apply to the next suggestion.
 
-## Options
+<p align="center"><img src="docs/settings-light.png" width="320" alt="Settings"></p>
 
-```
---context "..." / --context-file FILE   who you are / what this is about (a big quality lever)
---region L,T,W,H       start with a watched area (otherwise drag one in the window)
---mic                  also transcribe your own mic as "Me" (use headphones, or it will re-hear the speakers)
---manual               only suggest when you press Suggest
---model MODEL          default claude-opus-5-5; claude-sonnet-5-5 / claude-haiku-4-5 are faster and cheaper
---effort LEVEL         default low (ignored for Haiku)
---whisper MODEL        tiny.en | base.en (default) | small.en | ...; multilingual: small, medium + --language es
---console              print to the terminal instead of opening the window
---simulate             no audio: type what the other person said (prefix "me:" for yourself)
-```
+## Privacy and responsible use
 
-`--simulate` is the quickest way to check your API key and see the style of suggestions.
+- Your API key is stored encrypted for your Windows account (DPAPI) and only ever sent to Anthropic.
+- Speech is turned into text **on your PC**. Claude receives the transcript text and, only
+  if you've selected one, a picture of that text area.
+- Auto-suggest sends one request per spoken turn or text change; a busy hour is roughly a
+  dollar or two on the default model (my estimate, not measured). Sonnet or manual mode
+  costs less.
+- Transcription and screen reading make mistakes, and Claude is told never to invent facts or
+  experiences about you. Check anything factual before you say or send it.
+- Recording or transcribing other people can require their consent where you live, and many
+  employers, schools and interviewers prohibit live AI help. Check the rules for your
+  situation. The window doesn't hide itself from screen sharing.
 
-## Notes
+## Build from source
 
-- **Cost.** Each substantial spoken turn or text change is one Claude request (roughly
-  1–3k input tokens, ~100 output; a watched-area image adds a little). My rough estimate
-  is a dollar or two per busy hour on the default model (not measured). `--manual` or
-  `--model claude-sonnet-5-5` cuts it. Only the last ~8000 characters of conversation are sent.
-- **Memory.** Claude sees the spoken transcript so far, but only the *current* picture of
-  the watched area, not earlier ones.
-- **Latency.** Suggestions stream in after a ~1 s pause. If the watched text is mid-change
-  when someone speaks, the reply is held (up to 3 s) so the SAY and TYPE arrive together.
-- **Refusals.** For models that support it, requests include the server-side
-  `fallbacks: "default"` parameter so a safety-classifier decline is retried on a fallback
-  model automatically. `--no-fallbacks` or `LIVE_ASSISTANT_FALLBACKS=0` turns that off.
-- **Windows silence quirk.** WASAPI loopback can stop delivering audio while nothing is
-  playing; if the transcript stalls after a long silence, play any sound.
-- **Accuracy.** Speech-to-text and screen reading make mistakes, and Claude is told not to
-  invent facts or experiences about you. Treat suggestions as prompts, not scripts, and check
-  anything factual before you say or send it.
-
-## Use responsibly
-
-Recording or transcribing other people can require their consent depending on where you
-live, and many employers, schools and interviewers prohibit live AI assistance. Check the
-rules for your situation. The window deliberately doesn't hide itself from screen sharing.
-
-## Development
+Needs the [.NET 8 SDK](https://dotnet.microsoft.com/download).
 
 ```bash
-pip install pytest && python -m pytest
+dotnet test                                   # unit + headless UI tests (any OS)
+dotnet run --project src/Assistant.App        # run it (listening and text-area watching need Windows)
+dotnet publish src/Assistant.App -c Release -r win-x64 --self-contained -o publish
 ```
 
-Tests cover the speech splitter, transcript windowing, change detection, settings,
-request construction and response parsing (with a fake Claude client), and the engine's
-coalescing of speech and screen triggers. The Tk window (area picker, outline, copy
-buttons, settings dialog) was exercised end-to-end under a virtual X display; audio
-capture and Whisper need real hardware and aren't covered by automated tests.
+The **Build** GitHub Actions workflow runs the tests and produces the Windows zip.
+
+## How it's put together
+
+| | |
+|---|---|
+| `src/Assistant.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
+| `src/Assistant.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
+| `tests/` | 77 core tests (including the real SDK against a local fake server) and 14 headless UI tests that render the windows and drive the area picker with simulated input. |

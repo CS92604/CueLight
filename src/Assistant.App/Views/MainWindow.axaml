@@ -1,0 +1,145 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Assistant.App.ViewModels"
+        x:Class="Assistant.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Claude Live Assistant"
+        Icon="avares://ClaudeLiveAssistant/Assets/app.png"
+        Width="440" Height="780" MinWidth="380" MinHeight="560"
+        Topmost="{Binding PinOnTop}"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="PreferSystemChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        WindowStartupLocation="Manual">
+  <DockPanel>
+
+    <!-- Header -->
+    <Grid x:Name="Header" DockPanel.Dock="Top" Height="54" Margin="22,0,0,0" ColumnDefinitions="*,Auto,Auto,150" Background="Transparent">
+      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" IsHitTestVisible="False">
+        <Path Data="{StaticResource IconBurst}" Stroke="{DynamicResource Accent}" StrokeThickness="2.6" StrokeLineCap="Round" Width="20" Height="20" Stretch="Uniform" />
+        <TextBlock Classes="title" Text="Live Assistant" VerticalAlignment="Center" />
+      </StackPanel>
+      <ToggleButton Grid.Column="1" Classes="icon" IsChecked="{Binding PinOnTop}" ToolTip.Tip="Keep on top of other windows" VerticalAlignment="Center">
+        <Path Data="{StaticResource IconPin}" Stroke="{Binding $parent[ToggleButton].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round" Width="17" Height="17" Stretch="Uniform" />
+      </ToggleButton>
+      <Button Grid.Column="2" Classes="icon" Command="{Binding OpenSettingsCommand}" ToolTip.Tip="Settings" VerticalAlignment="Center" Margin="2,0,0,0">
+        <Path Data="{StaticResource IconSliders}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round" Width="17" Height="17" Stretch="Uniform" />
+      </Button>
+    </Grid>
+
+    <!-- Composer -->
+    <Border DockPanel.Dock="Bottom" Padding="18,8,18,14" Background="{DynamicResource Bg}">
+      <StackPanel Spacing="8">
+        <Border Classes="card" Padding="14,5,6,5" CornerRadius="22">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Classes="bare" Text="{Binding Hint}" Watermark="Ask for a different angle, e.g. “shorter”" VerticalAlignment="Center">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding SuggestCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+            <Button Grid.Column="1" Classes="send" Command="{Binding SuggestCommand}" ToolTip.Tip="Get suggestions now">
+              <Path Data="{StaticResource IconSend}" Stroke="White" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" Width="16" Height="16" Stretch="Uniform" />
+            </Button>
+          </Grid>
+        </Border>
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <ToggleSwitch IsChecked="{Binding AutoSuggest}" OnContent="Auto-suggest" OffContent="Auto-suggest" FontSize="12" />
+          <Button Grid.Column="2" Classes="ghost" Content="Clear chat" Command="{Binding ClearChatCommand}" />
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="18,0,18,16" Spacing="14">
+
+        <!-- Status -->
+        <StackPanel Spacing="8" Margin="4,0,4,0">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9">
+            <Ellipse Classes="dot" Classes.listening="{Binding IsListening}" Classes.busy="{Binding IsThinking}" Classes.error="{Binding IsError}" VerticalAlignment="Top" Margin="0,5,0,0" />
+            <TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" LineHeight="18" />
+            <Button Grid.Column="2" Classes="ghost" Content="Retry" Command="{Binding RetrySpeechCommand}" IsVisible="{Binding CanRetry}" Padding="10,3" />
+          </Grid>
+          <ProgressBar Classes="thin" Value="{Binding Progress}" Minimum="0" Maximum="100" IsVisible="{Binding ShowProgress}" />
+        </StackPanel>
+
+        <!-- Conversation -->
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <TextBlock Classes="eyebrow" Text="CONVERSATION" />
+            <TextBlock IsVisible="{Binding !HasTurns}" Classes="muted" TextWrapping="Wrap" LineHeight="20"
+                       Text="Nothing yet. Whatever your speakers play shows up here, transcribed on this PC." />
+            <ScrollViewer x:Name="TranscriptScroll" MaxHeight="156" IsVisible="{Binding HasTurns}" VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding Turns}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TurnVm">
+                    <Grid ColumnDefinitions="46,*" Margin="0,0,0,7">
+                      <TextBlock Text="{Binding Who}" Classes="who small" Classes.me="{Binding IsMe}" FontWeight="SemiBold" Margin="0,1,0,0" />
+                      <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" LineHeight="20" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </StackPanel>
+        </Border>
+
+        <!-- Text area -->
+        <Border Classes="card" Padding="14,12">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+            <Border Width="36" Height="36" CornerRadius="10" Background="{DynamicResource SurfaceAlt}" VerticalAlignment="Center">
+              <Path Data="{StaticResource IconScan}" Stroke="{DynamicResource TextMuted}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round" Width="18" Height="18" Stretch="Uniform" />
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+              <TextBlock Text="Text area" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding RegionText}" Classes="muted small" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button Grid.Column="2" Classes="secondary" Content="{Binding HasRegion, Converter={x:Static vm:Converters.SelectLabel}}" Command="{Binding SelectRegionCommand}" VerticalAlignment="Center" />
+            <Button Grid.Column="3" Classes="icon" Command="{Binding ClearRegionCommand}" IsVisible="{Binding HasRegion}" ToolTip.Tip="Stop watching" VerticalAlignment="Center">
+              <Path Data="{StaticResource IconClose}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" Width="14" Height="14" Stretch="Uniform" />
+            </Button>
+          </Grid>
+        </Border>
+
+        <!-- Suggestions -->
+        <StackPanel Spacing="12">
+          <TextBlock Classes="eyebrow" Text="SUGGESTIONS" Margin="4,4,0,0" />
+          <Border IsVisible="{Binding !HasSections}" Padding="4,6">
+            <TextBlock Classes="title muted" FontStyle="Italic" TextWrapping="Wrap" LineHeight="26" Foreground="{DynamicResource TextFaint}"
+                       Text="Suggestions will appear here as people talk or your text area changes." />
+          </Border>
+          <ItemsControl ItemsSource="{Binding Sections}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:SectionVm">
+                <StackPanel Spacing="8" Margin="0,0,0,12">
+                  <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsChip}" Margin="4,0,0,0">
+                    <Border Classes="chip say" IsVisible="{Binding IsSay}"><TextBlock Text="SAY" /></Border>
+                    <Border Classes="chip type" IsVisible="{Binding IsType}"><TextBlock Text="TYPE" /></Border>
+                    <TextBlock Text="{Binding Hint}" Classes="faint small" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <TextBlock IsVisible="{Binding IsNote}" Text="{Binding NoteText}" Classes="muted" TextWrapping="Wrap" Margin="4,0" />
+                  <ItemsControl ItemsSource="{Binding Options}" IsVisible="{Binding !IsNote}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:OptionVm">
+                        <Border Classes="option">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="14" LineHeight="21" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="ghost" Classes.done="{Binding JustCopied}" Content="{Binding CopyLabel}"
+                                    Command="{Binding CopyCommand}" IsEnabled="{Binding IsComplete}" VerticalAlignment="Top" />
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

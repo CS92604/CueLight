@@ -1,0 +1,157 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace Assistant.Core;
+
+public enum Professionalism { VeryCasual, Casual, Professional, Formal }
+public enum Proficiency { Simple, Everyday, Fluent, Advanced }
+public enum Tone { Warm, Neutral, Direct, Diplomatic, Confident }
+public enum ReplyLength { Brief, Short, Detailed }
+public enum SpeechAccuracy { Fast, Balanced, Accurate }
+
+/// <summary>User preferences. Saved as JSON; applies to the next suggestion.</summary>
+public sealed class Settings
+{
+    public Professionalism Professionalism { get; set; } = Professionalism.Professional;
+    /// <summary>How advanced the wording is, so the user can say it comfortably.</summary>
+    public Proficiency Proficiency { get; set; } = Proficiency.Fluent;
+    public Tone Tone { get; set; } = Tone.Warm;
+    public ReplyLength Length { get; set; } = ReplyLength.Short;
+    /// <summary>Suggestions per section (1-3).</summary>
+    public int Options { get; set; } = 2;
+    /// <summary>Empty = same language as the other person.</summary>
+    public string ReplyLanguage { get; set; } = "";
+    /// <summary>Free text: who the user is, words to avoid, background for the conversation.</summary>
+    public string CustomInstructions { get; set; } = "";
+
+    public string Model { get; set; } = Models.Default;
+    public bool UseMicrophone { get; set; }
+    public bool AutoSuggest { get; set; } = true;
+    public bool AlwaysOnTop { get; set; } = true;
+    public SpeechAccuracy SpeechAccuracy { get; set; } = SpeechAccuracy.Balanced;
+
+    public Settings Clone() => (Settings)MemberwiseClone();
+
+    public Settings Normalized()
+    {
+        var s = Clone();
+        s.Options = Math.Clamp(s.Options, 1, 3);
+        s.ReplyLanguage = (s.ReplyLanguage ?? "").Trim();
+        s.CustomInstructions = (s.CustomInstructions ?? "").Trim();
+        if (!Models.All.Any(m => m.Id == s.Model)) s.Model = Models.Default;
+        if (!Enum.IsDefined(Professionalism)) s.Professionalism = Professionalism.Professional;
+        if (!Enum.IsDefined(Proficiency)) s.Proficiency = Proficiency.Fluent;
+        if (!Enum.IsDefined(Tone)) s.Tone = Tone.Warm;
+        if (!Enum.IsDefined(Length)) s.Length = ReplyLength.Short;
+        if (!Enum.IsDefined(SpeechAccuracy)) s.SpeechAccuracy = SpeechAccuracy.Balanced;
+        return s;
+    }
+
+    /// <summary>The style block that goes into every request.</summary>
+    public string ToPrompt()
+    {
+        var s = Normalized();
+        var lines = new List<string>
+        {
+            $"- Formality: {Describe(s.Professionalism)}",
+            $"- My language proficiency (write wording I can say comfortably): {Describe(s.Proficiency)}",
+            $"- Tone: {Describe(s.Tone)}",
+            $"- Length: {Describe(s.Length)}",
+            $"- Options: up to {s.Options} per section",
+            $"- Reply language: {(s.ReplyLanguage.Length > 0 ? s.ReplyLanguage : "the same language the other person is using")}",
+        };
+        if (s.CustomInstructions.Length > 0) lines.Add($"- About me / extra instructions from me: {s.CustomInstructions}");
+        return string.Join("\n", lines);
+    }
+
+    public static string Describe(Professionalism v) => v switch
+    {
+        Professionalism.VeryCasual => "very casual, like texting a friend: contractions, relaxed phrasing, light slang is fine",
+        Professionalism.Casual => "casual and friendly, like talking to a colleague you get along with",
+        Professionalism.Professional => "professional: polite and clear, no slang, still natural and not stiff",
+        _ => "formal: courteous, precise and respectful, as with a senior stakeholder or in a formal setting",
+    };
+
+    public static string Describe(Proficiency v) => v switch
+    {
+        Proficiency.Simple => "simple English at about CEFR B1: common words, short sentences, easy to say out loud; avoid idioms and long words",
+        Proficiency.Everyday => "everyday conversational English at about CEFR B2: clear and natural, occasional idiom, no rare vocabulary",
+        Proficiency.Fluent => "fluent, native-like English at about CEFR C1: natural idioms and varied sentence structure",
+        _ => "highly articulate English at about CEFR C2: rich vocabulary and precise, polished phrasing",
+    };
+
+    public static string Describe(Tone v) => v switch
+    {
+        Tone.Warm => "warm and personable",
+        Tone.Neutral => "neutral and matter-of-fact",
+        Tone.Direct => "direct and to the point, without padding",
+        Tone.Diplomatic => "diplomatic and tactful, softening anything that could land badly",
+        _ => "confident and assertive, without being aggressive",
+    };
+
+    public static string Describe(ReplyLength v) => v switch
+    {
+        ReplyLength.Brief => "brief: one short sentence per option",
+        ReplyLength.Short => "short: one or two sentences per option",
+        _ => "detailed: two to four sentences per option, with a reason or example placeholder where it helps",
+    };
+}
+
+/// <summary>The Claude models the app offers.</summary>
+public sealed record ModelChoice(string Id, string Name, string Blurb);
+
+public static class Models
+{
+    public const string Default = "claude-opus-5-5";
+
+    public static readonly IReadOnlyList<ModelChoice> All = new[]
+    {
+        new ModelChoice("claude-opus-5-5", "Claude Opus 5.5", "Best replies"),
+        new ModelChoice("claude-sonnet-5-5", "Claude Sonnet 5.5", "Faster, lower cost"),
+        new ModelChoice("claude-haiku-4-5", "Claude Haiku 4.5", "Fastest, lowest cost"),
+    };
+}
+
+/// <summary>Reads and writes settings.json; a missing or unreadable file means defaults.</summary>
+public sealed class SettingsStore
+{
+    private static readonly JsonSerializerOptions Json = new()
+    {
+        WriteIndented = true,
+        Converters = { new JsonStringEnumConverter() },
+    };
+
+    private readonly string _path;
+
+    public SettingsStore(string? directory = null) =>
+        _path = Path.Combine(directory ?? AppPaths.ConfigDirectory, "settings.json");
+
+    public Settings Load()
+    {
+        try
+        {
+            return (JsonSerializer.Deserialize<Settings>(File.ReadAllText(_path), Json) ?? new Settings()).Normalized();
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return new Settings();
+        }
+    }
+
+    public void Save(Settings settings)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+        File.WriteAllText(_path, JsonSerializer.Serialize(settings.Normalized(), Json));
+    }
+}
+
+public static class AppPaths
+{
+    public const string AppName = "Claude Live Assistant";
+
+    public static string ConfigDirectory =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppName);
+
+    public static string DataDirectory =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), AppName);
+}

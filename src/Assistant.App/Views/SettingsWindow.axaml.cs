@@ -1,0 +1,21 @@
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+
+namespace Assistant.App.Views;
+
+public partial class SettingsWindow : Window
+{
+    public SettingsWindow()
+    {
+        InitializeComponent();
+        // Selecting list items scrolls them into view; start at the top regardless.
+        Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => Scroller.ScrollToHome(), Avalonia.Threading.DispatcherPriority.Background);
+        Header.PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) BeginMoveDrag(e);
+        };
+    }
+
+    private void OnDone(object? sender, RoutedEventArgs e) => Close();
+}
