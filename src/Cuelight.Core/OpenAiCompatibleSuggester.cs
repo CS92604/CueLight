@@ -259,8 +259,7 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
         var address = (_baseUrl ?? (info.IsCustom ? settings.BaseUrl : info.BaseUrl) ?? "").Trim().TrimEnd('/');
         if (address.Length == 0)
             throw new ProviderApiException("Enter the service's address in Settings, for example https://openrouter.ai/api/v1");
-        if (!Uri.TryCreate(address, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
-            throw new ProviderApiException("That address doesn't look right. It should start with https:// (or http:// for a service on this PC).");
+        if (ServiceAddress.Problem(address) is { } problem) throw new ProviderApiException(problem);
         return address;
     }
 
@@ -376,8 +375,7 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
         var info = Providers.Get(provider);
         var root = (baseUrl ?? (info.IsCustom ? address : info.BaseUrl) ?? "").Trim().TrimEnd('/');
         if (root.Length == 0) return (false, "Enter the service's address first, for example https://openrouter.ai/api/v1");
-        if (!Uri.TryCreate(root, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
-            return (false, "That address doesn't look right. It should start with https:// (or http:// for a service on this PC).");
+        if (ServiceAddress.Problem(root) is { } problem) return (false, problem);
         try
         {
             using var http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);

@@ -11,6 +11,15 @@ in words that sound like a person. Bring your own API key for **Claude, ChatGPT,
 NVIDIA** (which has a **free** key), or for any other service that speaks the OpenAI chat API
 (OpenRouter, Groq, a model running on your own PC with Ollama...).
 
+[![Build](https://github.com/CS92604/CueLight/actions/workflows/build.yml/badge.svg)](https://github.com/CS92604/CueLight/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-blue)
+
+[Get started](#get-started) · [Using it](#using-it) · [Settings](#settings) · [AI providers](#ai-providers) ·
+[What it costs](#what-it-costs) · [Privacy](#privacy-and-responsible-use) ·
+[If something doesn't work](#if-something-doesnt-work) · [Build from source](#build-from-source) ·
+[Contributing](CONTRIBUTING.md)
+
 <p align="center">
   <img src="docs/main-suggestions-light.png" width="300" alt="Suggestions to say and type, with Copy buttons">
   <img src="docs/main-suggestions-dark.png" width="300" alt="The same window in dark mode">
@@ -25,7 +34,8 @@ NVIDIA** (which has a **free** key), or for any other service that speaks the Op
 3. The first launch downloads a speech model (about 140 MB, once). The status line shows progress.
 
 Windows may show a "protected your PC" prompt because the app isn't code-signed yet:
-choose **More info**, then **Run anyway**.
+choose **More info**, then **Run anyway**. Each release lists the file's SHA-256, so you can check what you
+downloaded (`Get-FileHash .\Cuelight.exe` in PowerShell).
 
 **Runs on** 64-bit Windows 10 (1607 or later) and Windows 11 on Intel/AMD, with no installs:
 the .exe carries the .NET runtime and the Visual C++ runtime inside it. (On first start it unpacks
@@ -73,7 +83,7 @@ Then:
 - After someone finishes speaking you get up to a few options to **say**, each with a **Copy**
   button. If they asked you something, these answer it directly and briefly, in your voice.
 - **ANSWER.** When the other person asks a question, sets a riddle or leaves a sentence hanging, a
-  second, green-labelled box gives a fuller answer to say in your own words or draw from: the
+  second, pink-labelled box gives a fuller answer to say in your own words or draw from: the
   answer first, then the explanation behind it. It is separate from the quick conversational reply,
   and it appears only when there is something to answer. The AI is told to say so inside the
   answer when it isn't sure of a fact, so check anything that matters.
@@ -96,9 +106,9 @@ Then:
 
 ### What the AI sees
 
-Every request carries the **whole conversation so far** as text (about two hours of speech
-before the oldest turns start dropping off), but only the **current picture** of your text
-area. Earlier pictures are never kept or sent again, and the AI is told it only sees the
+Every request carries the **recent conversation** as text (up to about 30,000 characters, over half an
+hour of talk; when a call runs longer, the oldest part is dropped in one go), but only the **current picture**
+of your text area. Earlier pictures are never kept or sent again, and the AI is told it only sees the
 screen as it is now.
 
 ## Settings
@@ -223,6 +233,10 @@ slow part on your PC, choose **Fast** under Speech recognition.
 
 - Your API keys are stored encrypted for your Windows account (DPAPI), one per provider, and each is only
   ever sent to the provider it belongs to (or, for "Other", the address you entered).
+- The app connects to two things only: the AI provider you chose, and huggingface.co, once, to download the
+  speech model. It has no analytics, crash reporting or update check, and sends nothing to the author.
+- A plain `http://` address for "Other" is refused unless it points at this PC or your own network (an Ollama
+  on another machine at home is fine), so a key and a conversation can't be sent across the internet unencrypted.
 - Speech is turned into text **on your PC**. The provider you chose receives the transcript text and, only
   if you've selected one, a picture of that text area. Each provider has its own terms for what it does
   with what it receives; read them if that matters for what you discuss.
@@ -268,6 +282,9 @@ slow part on your PC, choose **Fast** under Speech recognition.
   another, or turn Type off).
 - **Behind a work proxy.** The app uses your Windows proxy settings and sign-in. Your AI provider and
   Hugging Face (first-run speech download) must be reachable.
+- **Still stuck?** [Open an issue](../../issues/new/choose). The form asks for your Windows version, the AI
+  provider and the end of the log. Remove any API key before pasting anything. For a security problem, see
+  [SECURITY.md](SECURITY.md) instead.
 
 ## Build from source
 
@@ -278,6 +295,10 @@ dotnet test                                   # unit + headless UI tests (any OS
 dotnet run --project src/Cuelight.App        # run it (listening and text-area watching need Windows)
 dotnet publish src/Cuelight.App -c Release -r win-x64 -o publish   # -> publish/Cuelight.exe, one file
 ```
+
+Avalonia's build tooling sends anonymous build-time usage data when you compile; set the environment
+variable `AVALONIA_TELEMETRY_OPTOUT=1` to turn that off (the built app itself sends nothing). See
+[CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
 The **Build** GitHub Actions workflow runs the tests (on Linux and on Windows), builds the
 single `.exe`, fails if the publish folder holds anything else, copies the `.exe` alone into an empty
@@ -292,13 +313,14 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Cuelight.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, the Claude client (official Anthropic .NET SDK) and a client for the OpenAI-style chat API used by ChatGPT, Gemini, Grok and others. |
 | `src/Cuelight.App` | Avalonia UI (light/dark, violet-and-blue theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 276 core tests (including the real SDK against a local fake server) and 121 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `tests/` | 326 core tests (including the real SDK against a local fake server) and 121 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
 
 ## License
 
 [MIT](LICENSE): you may use, copy, modify and share it freely, as long as the license notice stays with it.
-The fonts bundled with the app and the libraries it uses keep their own licenses (the fonts' license text
-is in `src/Cuelight.App/Assets/Fonts`).
+The fonts bundled with the app and the libraries it uses keep their own licenses: see
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) (the fonts' license text is also in
+`src/Cuelight.App/Assets/Fonts`).
 
 ## Credits
 

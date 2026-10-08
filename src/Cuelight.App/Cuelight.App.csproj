@@ -15,6 +15,9 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Version>1.0.0</Version>
+    <Product>Cuelight</Product>
+    <Company>CS92604</Company>
+    <Description>Listens to your PC's audio and suggests what to say or type, using your own AI key.</Description>
     <Copyright>Copyright (c) 2026 CS92604. MIT License.</Copyright>
   </PropertyGroup>
   <ItemGroup>

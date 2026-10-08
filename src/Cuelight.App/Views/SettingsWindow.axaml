@@ -31,7 +31,7 @@
         <StackPanel Spacing="10">
           <TextBlock Classes="eyebrow" Text="AI PROVIDER" />
           <StackPanel Spacing="8" Background="Transparent"
-                      ToolTip.Tip="Whose AI writes the suggestions: Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google), Grok (xAI), or any other service that speaks the OpenAI chat API. Each provider has its own key, saved separately, so switching back to one you already set up needs nothing more.">
+                      ToolTip.Tip="Whose AI writes the suggestions: Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google), Grok (xAI), NVIDIA (has a free key), or any other service that speaks the OpenAI chat API. Each provider has its own key, saved separately, so switching back to one you already set up needs nothing more.">
             <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.ProviderItems}" SelectedIndex="{Binding ProviderIndex}" />
             <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{Binding ProviderBlurb}" />
           </StackPanel>
