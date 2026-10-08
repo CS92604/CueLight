@@ -24,7 +24,7 @@ internal static class Program
         InstallSafetyNets();
         if (args.Contains("--self-test")) // checks this PC; see SelfTest
         {
-            if (!OperatingSystem.IsWindows()) { Console.Error.WriteLine("The self-test checks Windows features, so it only runs on Windows."); return 1; }
+            if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 14393)) { Console.Error.WriteLine("The self-test checks Windows features, so it only runs on Windows."); return 1; }
             return SelfTest.Run(args);
         }
 

@@ -84,7 +84,8 @@ public static class Providers
             new[]
             {
                 new ModelChoice("meta/llama-3.3-70b-instruct", "Llama 3.3 70B", "Free · text only",
-                    "Meta's Llama 3.3 70B on NVIDIA's free API catalog. Good replies, but it can't read pictures, so Type needs the vision model below."),
+                    "Meta's Llama 3.3 70B on NVIDIA's free API catalog. Good replies, but it can't read pictures, so Type needs Fast screen reading (or the vision model below).",
+                    SeesPictures: false),
                 new ModelChoice("meta/llama-3.2-11b-vision-instruct", "Llama 3.2 11B Vision", "Free · reads pictures",
                     "A smaller Llama that can also read pictures, so Type works. Its replies are weaker than the 70B's."),
             },
@@ -98,6 +99,15 @@ public static class Providers
     };
 
     public static ProviderInfo Get(Provider provider) => All.First(p => p.Id == provider);
+
+    /// <summary>False for a listed model that can't read pictures. Anything else (including a model name typed in) is
+    /// assumed to.</summary>
+    public static bool CanSeePictures(Provider provider, string? model)
+    {
+        if (provider == Provider.Claude) return true;
+        var choice = Get(provider).Models.FirstOrDefault(m => string.Equals(m.Id, (model ?? "").Trim(), StringComparison.Ordinal));
+        return choice?.SeesPictures ?? true;
+    }
 
     /// <summary>Which provider a key looks like it belongs to, going by how its provider's keys start; null if unsure.</summary>
     public static Provider? Detect(string? key)

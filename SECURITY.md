@@ -18,7 +18,7 @@ but reports are taken seriously.
 - API keys are stored encrypted with Windows' per-user protection (DPAPI) in your profile folder, one per
   provider. A key is only sent to the provider it belongs to (for "Other", the address you typed).
 - Speech is transcribed on your PC. The chosen AI provider receives the transcript text and, only if you pick a
-  text area, a picture of it.
+  text area, either the words read from it on your PC (Fast) or a picture of it (Detailed), as you choose in Settings.
 - The app connects to the AI provider you choose and, once, to huggingface.co to download the speech model.
   It sends no analytics or crash reports.
 - Plain `http://` addresses are refused unless they point at this PC or your own network.

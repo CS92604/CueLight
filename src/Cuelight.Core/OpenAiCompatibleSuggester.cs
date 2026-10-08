@@ -339,7 +339,7 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
             429 => $"{who} is rate-limiting this key right now. Try again in a moment. (A free key has small limits; turning Auto-suggest off makes fewer requests.)",
             >= 500 => $"{who}'s service had a problem. Try again in a moment.",
             400 when hadImage && (lower.Contains("image") || lower.Contains("vision") || lower.Contains("multimodal")) =>
-                $"“{model}” can't read pictures, so Type can't use it. Pick another model in Settings, or turn Type off.",
+                $"“{model}” can't read pictures, so Type can't use it. Pick another model in Settings, switch “Reading the text area” to Fast (which sends only words), or turn Type off.",
             _ => $"{who} error ({status}): {said}",
         };
         return new ProviderApiException(text, status);

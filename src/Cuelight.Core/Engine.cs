@@ -56,6 +56,7 @@ public sealed class Engine : IDisposable
 {
     private readonly ISuggester _suggester;
     private readonly IScreenCapture _capture;
+    private readonly ITextReader? _textReader;
     private readonly Func<Region, Action, Action<string>, IScreenWatcher> _watcherFactory;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly object _gate = new();
@@ -75,16 +76,19 @@ public sealed class Engine : IDisposable
     private double _queuedAt;
     private CancellationTokenSource? _runCts;
     private int _clearEpoch;
+    private string? _lastScreenText;   // the words last sent from the watched region (Fast screen reading), to skip a repeat
+    private bool _warnedNoReader;
     private readonly object _watcherLock = new();
     private IScreenWatcher? _watcher;
     private Task? _loop;
 
     public Engine(EngineOptions options, ISuggester suggester, IScreenCapture capture,
-        Func<Region, Action, Action<string>, IScreenWatcher>? watcherFactory = null)
+        Func<Region, Action, Action<string>, IScreenWatcher>? watcherFactory = null, ITextReader? textReader = null)
     {
         Options = options;
         _suggester = suggester;
         _capture = capture;
+        _textReader = textReader;
         _watcherFactory = watcherFactory ?? ((r, onChange, onError) =>
         {
             string? failure = null;
@@ -169,7 +173,7 @@ public sealed class Engine : IDisposable
 
     public void SetRegion(Region? region)
     {
-        lock (_gate) Region = region;
+        lock (_gate) { Region = region; _lastScreenText = null; }
         Emit(new EngineEvent(EngineEventKind.RegionChanged, Region: region));
         ReconcileWatcher();
     }
@@ -344,6 +348,7 @@ public sealed class Engine : IDisposable
             _lastKinds = Trigger.None;
             _lastHint = null;
             _lastReply = "";
+            _lastScreenText = null;
             _rejected.Clear();
         }
         Conversation.Clear();
@@ -411,23 +416,48 @@ public sealed class Engine : IDisposable
 
     private async Task RunAsync(Trigger kinds, string? hint, bool redo, string[] rejected, CancellationToken ct, int epoch)
     {
-        Emit(new EngineEvent(EngineEventKind.SuggestStart, redo ? "Trying another take…"
-            : kinds.HasFlag(Trigger.Forced) ? "Reading the text area…" : null));
-        byte[]? png = null;
-        if (Region is { } region && TextEnabled && (kinds & ~(Trigger.Speech | Trigger.Pause)) != Trigger.None)
+        bool started = false;
+        void Start()
         {
-            // Spoken-only triggers skip the image; any other trigger includes what's on screen now.
-            try { png = _capture.CapturePng(region); }
-            catch (Exception ex)
-            {
-                Emit(new EngineEvent(EngineEventKind.Status, $"Couldn't capture the text area ({ex.Message}); continuing without it."));
-            }
+            if (started) return;
+            started = true;
+            Emit(new EngineEvent(EngineEventKind.SuggestStart, redo ? "Trying another take…"
+                : kinds.HasFlag(Trigger.Forced) ? "Reading the text area…" : null));
         }
 
+        var settings = Settings.Normalized();
+        byte[]? png = null;
+        string? screenText = null;
+        if (Region is { } region && TextEnabled && (kinds & ~(Trigger.Speech | Trigger.Pause)) != Trigger.None)
+        {
+            // Spoken-only triggers skip the screen; any other trigger includes what's on screen now.
+            bool readAsText = ReadsScreenAsText(settings);
+            // Only the watched text changed: if its words are the same as the last time, there is nothing new to answer.
+            bool mayRepeat = !redo && (kinds & ~Trigger.Text) == Trigger.None;
+            if (!(readAsText && mayRepeat)) Start();
+            if (readAsText)
+            {
+                screenText = await ReadScreenTextAsync(region, ct);
+                if (screenText is not null && mayRepeat && SameWords(screenText, _lastScreenText)) return;
+                Start();
+                if (screenText is not null) lock (_gate) _lastScreenText = screenText;
+            }
+            if (screenText is null)
+            {
+                try { png = _capture.CapturePng(region); }
+                catch (Exception ex)
+                {
+                    Emit(new EngineEvent(EngineEventKind.Status, $"Couldn't capture the text area ({ex.Message}); continuing without it."));
+                }
+            }
+        }
+        Start();
+
         var request = new SuggestionRequest(
-            Conversation.Window(Options.TranscriptChars, Options.TranscriptKeepChars), Settings.Normalized(), kinds, hint, png,
+            Conversation.Window(Options.TranscriptChars, Options.TranscriptKeepChars), settings, kinds, hint, png,
             rejected.Length > 0 ? rejected : null)
         {
+            RegionText = screenText,
             OnUsage = u =>
             {
                 Usage.Add(u);
@@ -476,6 +506,45 @@ public sealed class Engine : IDisposable
             && reply.ToString().TrimStart().StartsWith("(nothing", StringComparison.OrdinalIgnoreCase))
             ScheduleFollowUp(seq, epoch);
     }
+
+    /// <summary>Fast screen reading is chosen (or the model can't read pictures) and this PC can read text from the screen.</summary>
+    private bool ReadsScreenAsText(Settings settings)
+    {
+        if (_textReader is null) return false;
+        bool wanted = settings.ScreenReading == ScreenReading.Fast || !Providers.CanSeePictures(settings.Provider, settings.Model);
+        if (!wanted) return false;
+        if (_textReader.IsAvailable) return true;
+        if (!_warnedNoReader)
+        {
+            _warnedNoReader = true;
+            Emit(new EngineEvent(EngineEventKind.Status,
+                "This PC can't read text from the screen (Windows has no text recognition installed for your language), so the text area is sent as a picture."));
+        }
+        return false;
+    }
+
+    /// <summary>The words in the watched region, read on this PC; null if they can't be read, in which case a picture is sent instead.</summary>
+    private async Task<string?> ReadScreenTextAsync(Region region, CancellationToken ct)
+    {
+        try
+        {
+            var (bgra, width, height) = _capture.GrabBgra(region);
+            var text = (await _textReader!.ReadAsync(bgra, width, height, ct)).Trim();
+            if (text.Count(char.IsLetterOrDigit) >= 2) return text;
+            Emit(new EngineEvent(EngineEventKind.Status, "No words could be read in the text area, so it is sent as a picture."));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"Reading the text area failed, sending a picture instead: {ex.Message}");
+            Emit(new EngineEvent(EngineEventKind.Status, $"Couldn't read the words in the text area ({ex.Message}), so it is sent as a picture."));
+        }
+        return null;
+    }
+
+    private static bool SameWords(string a, string? b) =>
+        b is not null && string.Equals(string.Join(' ', a.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)),
+                                       string.Join(' ', b.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)), StringComparison.Ordinal);
 
     private void ScheduleFollowUp(int seq, int epoch)
     {

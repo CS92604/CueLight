@@ -327,6 +327,7 @@ public class OpenAiCompatibleSuggesterTests
         var ex = await Assert.ThrowsAsync<ProviderApiException>(() => Collect(Suggester(server), Req(Provider.Other, "text-only", png: new byte[] { 1 }, address: server.Url)));
         Assert.Contains("can't read pictures", ex.Message);
         Assert.Contains("turn Type off", ex.Message);
+        Assert.Contains("Fast", ex.Message);
     }
 
     [Fact]

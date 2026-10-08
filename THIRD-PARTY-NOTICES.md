@@ -18,6 +18,7 @@ that anyone who gets only the `.exe` can still find it here.
 | [NAudio](https://github.com/naudio/NAudio) (`NAudio.Core`, `NAudio.Wasapi`) | Hearing what the PC plays, and the microphone | MIT | Mark Heath |
 | [Whisper.net](https://github.com/sandrohanea/whisper.net) | Runs speech recognition from .NET | MIT | sandrohanea |
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (the native libraries in `Whisper.net.Runtime` and `Whisper.net.Runtime.NoAvx`) | Speech recognition on your PC | MIT | The ggml authors |
+| The Windows SDK .NET projection (`Microsoft.Windows.SDK.NET.dll`) and [C#/WinRT](https://github.com/microsoft/CsWinRT) (`WinRT.Runtime.dll`) | Lets the app call Windows' own text recognition, which reads the words in the text area on your PC (Fast screen reading) | Microsoft's [Windows SDK license terms](https://aka.ms/WinSDKLicenseURL); MIT (C#/WinRT) | Microsoft Corporation |
 | [Anthropic .NET SDK](https://github.com/anthropics/anthropic-sdk-csharp) | Talks to Claude | MIT | Anthropic |
 | Microsoft Visual C++ runtime (`vcruntime140.dll`, `vcruntime140_1.dll`, `msvcp140.dll`, `vcomp140.dll`) | Needed by the speech engine's native libraries | Microsoft's [redistributable terms](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files) | Microsoft Corporation |
 

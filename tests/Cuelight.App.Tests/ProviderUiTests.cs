@@ -402,3 +402,87 @@ public class ProviderScreenTests
         win.Close();
     }
 }
+
+public class ScreenReadingUiTests
+{
+    static SettingsViewModel Make(Settings settings, Func<bool>? available = null, Action? changed = null) =>
+        new(settings, changed ?? (() => { }), new KeyEntryViewModel(), null, _ => { }, textReadingAvailable: available);
+
+    [Fact]
+    public void The_two_choices_are_Fast_and_Detailed_and_each_explains_itself()
+    {
+        Assert.Equal(new[] { "Fast", "Detailed" }, SettingsViewModel.ScreenItems.Select(i => i.Name));
+        Assert.All(SettingsViewModel.ScreenItems, i => { Assert.False(string.IsNullOrWhiteSpace(i.Blurb)); Assert.True(i.Tip.Length > 100); });
+        Assert.Contains("only text", SettingsViewModel.ScreenItems[0].Blurb);
+        Assert.Contains("picture", SettingsViewModel.ScreenItems[1].Blurb);
+        Assert.Contains("a picture of the text area is sent", SettingsViewModel.ScreenItems[1].Tip);
+        Assert.Contains("only the words are sent", SettingsViewModel.ScreenItems[0].Tip);
+    }
+
+    [Fact]
+    public void Choosing_one_changes_the_setting_and_says_so()
+    {
+        var settings = new Settings();
+        int changes = 0;
+        var vm = Make(settings, changed: () => changes++);
+        Assert.Equal(ScreenReading.Detailed, vm.SelectedScreen!.Value);
+
+        vm.SelectedScreen = SettingsViewModel.ScreenItems[0];
+        Assert.Equal(ScreenReading.Fast, settings.ScreenReading);
+        Assert.Equal(1, changes);
+        vm.SelectedScreen = SettingsViewModel.ScreenItems[1];
+        Assert.Equal(ScreenReading.Detailed, settings.ScreenReading);
+        vm.SelectedScreen = null;                                   // a ListBox clears its selection while it rebuilds: ignored
+        Assert.Equal(ScreenReading.Detailed, settings.ScreenReading);
+    }
+
+    [Fact]
+    public void A_PC_that_cant_read_text_is_warned_only_when_Fast_is_chosen()
+    {
+        var settings = new Settings();
+        var vm = Make(settings, available: () => false);
+        Assert.False(vm.TextReadingMissing);
+        vm.SelectedScreen = SettingsViewModel.ScreenItems[0];
+        Assert.True(vm.TextReadingMissing);
+        Assert.False(Make(new Settings { ScreenReading = ScreenReading.Fast }, available: () => true).TextReadingMissing);
+    }
+
+    [Fact]
+    public void Brightness_and_inversion_help_dark_mode_text_get_read()
+    {
+        var black = new byte[400]; for (int i = 3; i < black.Length; i += 4) black[i] = 255;
+        var white = Enumerable.Repeat((byte)255, 400).ToArray();
+        Assert.Equal(0, Platform.WindowsTextReader.MeanBrightness(black), 3);
+        Assert.Equal(255, Platform.WindowsTextReader.MeanBrightness(white), 3);
+
+        var inverted = Platform.WindowsTextReader.Inverted(black);
+        Assert.Equal(255, inverted[0]);
+        Assert.Equal(255, inverted[2]);
+        Assert.Equal(255, inverted[3]);                              // opaque
+        Assert.Equal(black, Platform.WindowsTextReader.Inverted(inverted).Select((b, i) => i % 4 == 3 ? black[i] : b).ToArray());
+    }
+
+    [AvaloniaFact]
+    public void The_section_shows_in_the_settings_window_with_its_warning_only_when_needed()
+    {
+        var settings = new Settings { ScreenReading = ScreenReading.Fast };
+        var win = new SettingsWindow { DataContext = Make(settings, available: () => false), Width = 480, Height = 760 };
+        win.Show();
+        try
+        {
+            win.FindControl<ScrollViewer>("Scroller")!.ScrollToEnd();   // the lists further down are only built once they scroll into view
+            UiTests.Settle();
+            var texts = win.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? "").ToList();
+            Assert.Contains("READING THE TEXT AREA", texts);
+            Assert.Contains(texts, t => t.StartsWith("Reads the words on this PC"));
+            Assert.Contains(texts, t => t.StartsWith("Sends a picture of the area"));
+            Assert.Contains(texts, t => t.StartsWith("Windows has no text recognition installed"));
+
+            ((SettingsViewModel)win.DataContext!).SelectedScreen = SettingsViewModel.ScreenItems[1];
+            UiTests.Settle();
+            Assert.DoesNotContain(win.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? ""),
+                t => t.StartsWith("Windows has no text recognition installed"));
+        }
+        finally { win.Close(); }
+    }
+}

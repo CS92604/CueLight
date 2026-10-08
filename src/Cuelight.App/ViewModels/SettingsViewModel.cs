@@ -6,6 +6,8 @@ namespace Cuelight.App.ViewModels;
 
 public sealed record SpeechChoice(SpeechAccuracy Value, string Name, string Blurb, string Tip = "");
 
+public sealed record ScreenChoice(ScreenReading Value, string Name, string Blurb, string Tip = "");
+
 /// <summary>One option of a segmented control, with the explanation shown when the mouse rests on it.</summary>
 public sealed record ChoiceItem(string Label, string Tip)
 {
@@ -20,11 +22,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <param name="currentKey">The saved key of the current provider.</param>
     /// <param name="keyChanged">Called with a new key for the current provider, or null when it is removed.</param>
     /// <param name="keyFor">The saved key of any provider, for when the provider is switched here.</param>
+    /// <param name="textReadingAvailable">Whether this PC can read the words in a screen area (Fast screen reading); assumed so if not given.</param>
     public SettingsViewModel(Settings settings, Action changed, KeyEntryViewModel keyEntry, string? currentKey, Action<string?> keyChanged,
-        Func<Provider, string?>? keyFor = null)
+        Func<Provider, string?>? keyFor = null, Func<bool>? textReadingAvailable = null)
     {
         _s = settings;
         _changed = changed;
+        _textReadingAvailable = textReadingAvailable ?? (() => true);
         KeyEntry = keyEntry;
         _keyChanged = keyChanged;
         var startedWith = settings.Provider;
@@ -41,6 +45,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         };
     }
 
+    private readonly Func<bool> _textReadingAvailable;
     private readonly Action<string?> _keyChanged;
     private readonly Func<Provider, string?> _keyFor;
     private const string NoKeyText = "No key saved";
@@ -88,6 +93,32 @@ public sealed partial class SettingsViewModel : ObservableObject
         new SpeechChoice(SpeechAccuracy.Accurate, "Accurate", "470 MB download, best accuracy, slower",
             "The most accurate. Needs a fast PC, and may fall behind live speech on a slow one."),
     };
+
+    public static IReadOnlyList<ScreenChoice> ScreenItems { get; } = new[]
+    {
+        new ScreenChoice(ScreenReading.Fast, "Fast", "Reads the words on this PC and sends only text. Quicker and cheaper.",
+            "Fast: the text area is read on this PC with Windows' own text recognition, and only the words are sent to the AI, not a picture. It costs less, "
+            + "starts a little quicker, and is the only way a model that can't read pictures can reply to the text area. The AI can't see layout, colours or "
+            + "images, so it works out who wrote what from names and wording, and a misread word can slip in."),
+        new ScreenChoice(ScreenReading.Detailed, "Detailed", "Sends a picture of the area each time it changes. Sees everything.",
+            "Detailed: a picture of the text area is sent to the AI each time it changes, so it sees exactly what you see: layout, colours, who wrote each "
+            + "message, images. It costs more, and needs a model that can read pictures."),
+    };
+
+    public ScreenChoice? SelectedScreen
+    {
+        get => ScreenItems.FirstOrDefault(s => s.Value == _s.ScreenReading);
+        set
+        {
+            if (value is null) return;
+            _s.ScreenReading = value.Value;
+            OnPropertyChanged(nameof(TextReadingMissing));
+            Changed(nameof(SelectedScreen));
+        }
+    }
+
+    /// <summary>Fast is chosen but this PC can't read text from the screen, so a picture is sent instead.</summary>
+    public bool TextReadingMissing => _s.ScreenReading == ScreenReading.Fast && !_textReadingAvailable();
 
     public KeyEntryViewModel KeyEntry { get; }
 

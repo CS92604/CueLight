@@ -61,6 +61,11 @@ Two switches sit at the top of the window.
   document. A thin blue outline stays around it (just outside, so it's never in what the AI
   sees). When the text changes and stops changing, the AI reads it and suggests what to **type**.
   Keep the Cuelight window off the box. Switching Type off stops watching but remembers the box.
+- **Fast or Detailed** (Settings → Reading the text area) is how the text area reaches the AI.
+  **Fast** reads the words in the area on your PC, with Windows' own text recognition, and sends only that
+  text: no picture leaves your PC. **Detailed** sends an actual picture of the area to the provider each time it
+  changes, so the AI sees the layout, colours, images and who wrote each message. See
+  [Fast or Detailed?](#fast-or-detailed).
 
 Then:
 
@@ -107,9 +112,31 @@ Then:
 ### What the AI sees
 
 Every request carries the **recent conversation** as text (up to about 30,000 characters, over half an
-hour of talk; when a call runs longer, the oldest part is dropped in one go), but only the **current picture**
-of your text area. Earlier pictures are never kept or sent again, and the AI is told it only sees the
+hour of talk; when a call runs longer, the oldest part is dropped in one go), but only the **current state** of
+your text area: its words (Fast) or a picture of it (Detailed). Earlier pictures or read-out text are never kept or sent again, and the AI is told it only sees the
 screen as it is now.
+
+### Fast or Detailed?
+
+When Type is on, the text area has to reach the AI somehow. Settings → **Reading the text area** chooses how:
+
+| | **Fast** | **Detailed** (the default) |
+|---|---|---|
+| What reaches the AI | The words in the area, read on your PC with Windows' own text recognition | An actual picture of the area, sent each time it changes |
+| What leaves your PC | Only text | A picture, with everything in it: names, avatars, anything else in the area |
+| Cost | Less: roughly 150–400 tokens of text, against about 500 for a chat-sized picture | More, and a larger area costs more |
+| Speed | Skips making and uploading a picture and the provider's picture processing, but first spends a moment reading the words on your PC. The saving is small and depends on your PC and provider, so try both. | Nothing to read first: the picture goes straight out |
+| What the AI can tell | Only the words, top to bottom. It works out who wrote what from names and wording, can't see colours, alignment or images, and a misread word can slip in | Everything you see, so who wrote each message is clear even in a chat with bubbles on each side |
+| Models | Any model, including ones that can't read pictures | Only models that can read pictures |
+| Needs | A text-recognition language installed in Windows (usually already there). If it isn't, the app sends a picture instead and says so | Nothing extra |
+
+Use **Fast** for plain text (an email, a document, a simple chat) when you want it cheaper, want nothing but words to
+leave your PC, or are using a model that can't read pictures. Use **Detailed** when who said what depends on the layout, or
+the area has images, tables or charts. A model that is known to be text-only (such as NVIDIA's Llama 3.3 70B) uses Fast
+automatically.
+
+With Fast, a request is only sent when the *words* in the area change: a blinking cursor or a new avatar changes the
+picture but not the words, so nothing is sent. **Panic** and your own typed requests always send.
 
 ## Settings
 
@@ -124,6 +151,7 @@ screen as it is now.
 | AI provider | Claude · ChatGPT · Gemini · Grok · NVIDIA (free) · Other (any OpenAI-compatible service). Each provider has its own saved key, so switching back needs nothing more. See [AI providers](#ai-providers). |
 | Model | The models listed for the chosen provider (Claude: Sonnet 5.5 recommended and the default, Opus 5.5 for the best replies at twice the cost, Haiku 5.5 the cheapest). Every provider but Claude also takes any model name typed in, since models are replaced often. |
 | Think before replying | Off by default, so a reply starts as soon as it can. On, the AI spends more effort on each reply: slower to start, better on hard or technical questions. |
+| Reading the text area | **Fast** (the words in the area are read on your PC and only text is sent) or **Detailed** (a picture of the area is sent). Only matters when Type is on. See [Fast or Detailed?](#fast-or-detailed). Detailed by default. |
 | Hide from screen sharing | Keeps every window of the app out of screen shares, recordings and screenshots. Windows 10 version 2004 or later. Off by default; see Privacy below. |
 | Microphone | Also transcribe your own voice, so the AI knows what you've said. Use headphones. |
 | Speech recognition | Fast · Balanced · Accurate (downloads a different model) |
@@ -138,12 +166,12 @@ Changes are saved as you make them and apply to the next suggestion.
 | **ChatGPT** (OpenAI) | [platform.openai.com](https://platform.openai.com/api-keys) | GPT-6.1 Sol, GPT-6 Astra, GPT-6 Luna | A ChatGPT subscription doesn't include API use; the key comes from the API platform. |
 | **Gemini** (Google) | [aistudio.google.com](https://aistudio.google.com/apikey) | Gemini 3.8 Flash, Gemini 3.1 Pro (preview) | Called through Google's OpenAI-compatible address. |
 | **Grok** (xAI) | [console.x.ai](https://console.x.ai) | Grok 4.7, Grok 4.3 | |
-| **NVIDIA** | [build.nvidia.com](https://build.nvidia.com/settings/api-keys) | Llama 3.3 70B, Llama 3.2 11B Vision | **Free** (see below). Llama 3.3 70B can't read pictures, so Type needs the Vision one. |
+| **NVIDIA** | [build.nvidia.com](https://build.nvidia.com/settings/api-keys) | Llama 3.3 70B, Llama 3.2 11B Vision | **Free** (see below). Llama 3.3 70B can't read pictures, so it uses Fast screen reading automatically (or pick the Vision model for Detailed). |
 | **Other** | wherever the service says | the model name you type | Any service with an OpenAI-style `/chat/completions` address, for example `https://openrouter.ai/api/v1`, `https://api.groq.com/openai/v1` or `http://localhost:11434/v1` (Ollama on this PC, which needs no key). |
 
 Model names were current in October 2026. They change often, so Settings also takes any model name
-you type; if a provider doesn't know it, the status line says so. A model has to **accept pictures** for
-Type to work (turn Type off for one that can't). The app asks for little or no thinking before a reply
+you type; if a provider doesn't know it, the status line says so. For **Detailed** screen reading a model has to
+**accept pictures**; **Fast** sends only text, so any model works (and the app switches to it by itself for a listed model that can't read pictures). The app asks for little or no thinking before a reply
 (see [Speed](#speed)); if a provider refuses one of the optional settings it sends, the app sends the
 request again without it and remembers that for the model.
 
@@ -245,7 +273,9 @@ How the figures were worked out:
   cached rate wasn't confirmed, so its figures are an upper bound and grow fastest as a call gets longer.
 - **The reply.** With the default settings (short replies, two options each) a say-only reply is about 70 tokens, an
   ANSWER box adds about 170, and a reply for the text area adds about 70. A typical chat-sized text area is about 500
-  tokens of picture, billed in full each time (a whole-screen area can be three times that).
+  tokens of picture, billed in full each time (a whole-screen area can be three times that). With **Fast** screen
+  reading the same area is roughly 150–400 tokens of text, so the "Also reading the screen" column comes out a little
+  lower; the saving is small next to the reply itself.
 - **Longer calls cost more per suggestion** because more conversation is re-read each time: a third to a half more on Claude
   and ChatGPT once a call reaches the 30,000-character limit, and two to two and a half times on Gemini and Grok.
   Without the cache, a Claude Sonnet suggestion would cost roughly four times as much.
@@ -290,7 +320,9 @@ merge window, and the AI's own time to start answering. To keep the last one sho
 Haiku reply without thinking first and the other providers are asked for low reasoning effort (Settings →
 **Think before replying** gives the AI more room to think), and the smaller models are the quickest; models
 that always reason, like Claude Opus 5.5 and Grok 4.7, start a little slower. If transcribing is the
-slow part on your PC, choose **Fast** under Speech recognition.
+slow part on your PC, choose **Fast** under Speech recognition. For the text area, **Fast** reading under
+[Reading the text area](#fast-or-detailed) swaps making and uploading a picture for reading its words on your PC; the
+difference is small and varies, so it is worth trying both.
 
 ## Privacy and responsible use
 
@@ -301,7 +333,8 @@ slow part on your PC, choose **Fast** under Speech recognition.
 - A plain `http://` address for "Other" is refused unless it points at this PC or your own network (an Ollama
   on another machine at home is fine), so a key and a conversation can't be sent across the internet unencrypted.
 - Speech is turned into text **on your PC**. The provider you chose receives the transcript text and, only
-  if you've selected one, a picture of that text area. Each provider has its own terms for what it does
+  if you've turned Type on and picked a text area, either the words read from it on your PC (**Fast**) or a picture
+  of it (**Detailed**), as you choose in Settings. Each provider has its own terms for what it does
   with what it receives; read them if that matters for what you discuss.
 - Auto-suggest sends a request after nearly every sentence you hear, and API use costs money.
   See **What it costs** above.
@@ -343,6 +376,10 @@ slow part on your PC, choose **Fast** under Speech recognition.
 - **A provider says no.** The status line shows what it said, in plain words: a key it doesn't accept, a model
   name it doesn't know (pick another in Settings), no credit left, or a model that can't read pictures (pick
   another, or turn Type off).
+- **"Windows has no text recognition installed."** Fast screen reading uses Windows' own text recognition, which comes
+  with a language's optional features. In Windows Settings → Time & language → Language & region, open your language's
+  options and make sure **Optical character recognition** is installed (or add English). Until then the app sends a
+  picture of the text area instead.
 - **Behind a work proxy.** The app uses your Windows proxy settings and sign-in. Your AI provider and
   Hugging Face (first-run speech download) must be reachable.
 - **Still stuck?** [Open an issue](../../issues/new/choose). The form asks for your Windows version, the AI
@@ -358,6 +395,9 @@ dotnet test                                   # unit + headless UI tests (any OS
 dotnet run --project src/Cuelight.App        # run it (listening and text-area watching need Windows)
 dotnet publish src/Cuelight.App -c Release -r win-x64 -o publish   # -> publish/Cuelight.exe, one file
 ```
+
+The app targets Windows 10's APIs (for the text recognition), so on Linux or macOS the first build downloads
+a small Windows targeting pack from NuGet by itself; nothing else changes.
 
 Avalonia's build tooling sends anonymous build-time usage data when you compile; set the environment
 variable `AVALONIA_TELEMETRY_OPTOUT=1` to turn that off (the built app itself sends nothing). See
@@ -375,8 +415,8 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 | | |
 |---|---|
 | `src/Cuelight.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, the Claude client (official Anthropic .NET SDK) and a client for the OpenAI-style chat API used by ChatGPT, Gemini, Grok and others. |
-| `src/Cuelight.App` | Avalonia UI (light/dark, violet-and-blue theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 327 core tests (including the real SDK against a local fake server) and 121 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `src/Cuelight.App` | Avalonia UI (light/dark, violet-and-blue theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Windows text recognition for Fast screen reading (Windows.Media.Ocr), Whisper speech recognition (Whisper.net / whisper.cpp). |
+| `tests/` | 345 core tests (including the real SDK against a local fake server) and 126 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
 
 ## License
 

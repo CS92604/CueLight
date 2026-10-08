@@ -151,6 +151,25 @@
           </Border>
         </StackPanel>
 
+        <!-- Text area -->
+        <StackPanel Spacing="10">
+          <TextBlock Classes="eyebrow" Text="READING THE TEXT AREA" />
+          <ListBox Classes="choices" ItemsSource="{x:Static vm:SettingsViewModel.ScreenItems}" SelectedItem="{Binding SelectedScreen}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ScreenChoice">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" MinWidth="64" />
+                  <TextBlock Grid.Column="1" Text="{Binding Blurb}" Classes="muted small" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBlock Classes="small" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" IsVisible="{Binding TextReadingMissing}"
+                     Text="Windows has no text recognition installed for your language, so a picture is sent instead." />
+          <TextBlock Classes="faint small" TextWrapping="Wrap"
+                     Text="What the AI gets for the text area when Type is on. The conversation is always sent as text." />
+        </StackPanel>
+
         <!-- Privacy -->
         <StackPanel Spacing="10">
           <TextBlock Classes="eyebrow" Text="PRIVACY" />

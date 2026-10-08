@@ -55,8 +55,8 @@ public sealed partial class KeyEntryViewModel : ObservableObject
     public string ContinueTip => Info.IsCustom ? "Check that the service answers, then start." : $"Check the key with {Info.Company} and start.";
 
     public string PrivacyText => Info.IsCustom
-        ? "Your key is stored encrypted on this PC and is only ever sent to the service you enter. Speech is turned into text on your PC; only text, and the text area you choose, is sent to that service."
-        : $"Your key is stored encrypted on this PC and is only ever sent to {Info.Company}. Speech is turned into text on your PC; only text, and the text area you choose, is sent to {Info.Name}.";
+        ? "Your key is stored encrypted on this PC and is only ever sent to the service you enter. Speech is turned into text on your PC; only text, and (if you pick a text area) either its words or a picture of it, is sent to that service."
+        : $"Your key is stored encrypted on this PC and is only ever sent to {Info.Company}. Speech is turned into text on your PC; only text, and (if you pick a text area) either its words or a picture of it, is sent to {Info.Name}.";
 
     public string BillingText => Provider switch
     {
