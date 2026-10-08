@@ -211,13 +211,76 @@ other model it counts tokens instead of dollars, and says the total is incomplet
   isn't broken by a start that keeps moving. A very long monologue keeps only its latest part.
 - **Clear chat** when a new call starts, so it isn't paying to re-read the last one.
 
-Rough figures for Claude, from Anthropic's list prices and an estimate of how many tokens a conversation
-takes (not yet compared with a real bill, so treat them as a guide, and trust the counter
-in the app and your Console): about **half a cent per suggestion on Sonnet** (a bit more when it
-is also reading a text area), roughly **$1 for an hour of a busy conversation**, with Haiku 5.5 at a
-few cents for the same hour and Opus 5.5 at roughly double Sonnet. Without the cache the same hour
-would have cost roughly three times as much. Turning **Auto-suggest** off (then it only answers when you
-press Send or Panic) or **Type** off (no screen pictures) costs less still.
+### Approximate cost per suggestion
+
+A suggestion is one request to the AI, sent each time the other person pauses. These are estimates from the
+providers' list prices and the size of the app's real requests. They haven't been compared with real bills yet,
+so treat them as a guide, and trust the counter in the app and your provider's dashboard.
+
+| Model | One suggestion (say only) | With an ANSWER box | Also reading the screen | One busy hour* |
+|---|---|---|---|---|
+| **Claude Sonnet 5.5** (default) | 0.16¢ | 0.33¢ | 0.34¢ | $0.33–0.67 |
+| **Claude Opus 5.5** | 0.33¢ | 0.67¢ | 0.68¢ | $0.66–1.34 |
+| **Claude Haiku 5.5** | 0.01¢ | 0.02¢ | 0.02¢ | $0.02–0.04 |
+| **GPT-6.1 Sol** (default) | 0.16¢ | 0.33¢ | 0.33¢ | $0.31–0.65 |
+| **GPT-6 Astra** | 0.93¢ | 1.78¢ | 1.82¢ | $1.87–3.57 |
+| **GPT-6 Luna** | 0.01¢ | 0.02¢ | 0.02¢ | $0.02–0.04 |
+| **Gemini 3.8 Flash** (default) | 0.55¢ | 0.68¢ | 0.69¢ | $1.11–1.36 |
+| **Gemini 3.1 Pro** (preview) | 0.75¢ | 0.96¢ | 0.94¢ | $1.50–1.91 |
+| **Grok 4.7** (default) | 0.25¢ | 0.35¢ | 0.40¢ | $0.50–0.71 |
+| **Grok 4.3** | 0.11¢ | 0.16¢ | 0.20¢ | $0.23–0.31 |
+| **NVIDIA** (Llama 3.3 70B, Llama 3.2 11B Vision) | free | free | free | free |
+| **Other** | whatever that service charges; a model on your own PC costs nothing | | | |
+
+\* An hour of a busy conversation is about 200 suggestions. The range runs from every one being say-only to every one
+including an ANSWER box, which only appears when there is something to answer, so a real hour usually lands near the
+low end. A cent is 0.01 dollars: 0.16¢ is about 6 suggestions for a cent.
+
+How the figures were worked out:
+
+- **The request.** The app's instructions are about 1,200 tokens, the style settings about 110, and the conversation so
+  far is 10 minutes of talk (about 2,000 tokens). Token counts use the app's own estimate of four characters per token.
+- **The cache.** The instructions and the older conversation are billed at the cached rate (Claude, ChatGPT and Grok),
+  and only the newest few hundred tokens at the full rate. Gemini is counted with no cache discount, because Google's
+  cached rate wasn't confirmed, so its figures are an upper bound and grow fastest as a call gets longer.
+- **The reply.** With the default settings (short replies, two options each) a say-only reply is about 70 tokens, an
+  ANSWER box adds about 170, and a reply for the text area adds about 70. A typical chat-sized text area is about 500
+  tokens of picture, billed in full each time (a whole-screen area can be three times that).
+- **Longer calls cost more per suggestion** because more conversation is re-read each time: a third to a half more on Claude
+  and ChatGPT once a call reaches the 30,000-character limit, and two to two and a half times on Gemini and Grok.
+  Without the cache, a Claude Sonnet suggestion would cost roughly four times as much.
+- **Thinking costs extra and isn't in these numbers.** A model that thinks before it answers bills that thinking as
+  output. Claude Opus 5.5 and Grok 4.7 always do, and any model does with **Think before replying** on, so those can
+  cost several times the figure above. Each 1,000 tokens of thinking adds the model's output price divided by 1,000
+  (about 1¢ on Sonnet, 2¢ on Opus, 0.6¢ on Grok 4.7).
+- **Gemini 3.8 Flash** is half this price until the end of 2026; the figure uses the standard price from 2027, so it
+  isn't too low.
+
+Turning **Auto-suggest** off (then it only answers when you press Send or Panic) or **Type** off (no screen
+pictures) costs less still.
+
+<details>
+<summary>The prices used (US dollars per million tokens)</summary>
+
+| Model | Model name | Input | Cached input | Output |
+|---|---|---|---|---|
+| Claude Opus 5.5 | `claude-opus-5-5` | $4 | $0.20 | $20 |
+| Claude Sonnet 5.5 | `claude-sonnet-5-5` | $2 | $0.10 | $10 |
+| Claude Haiku 5.5 | `claude-haiku-5-5` | $0.10 | $0.01 | $0.50 |
+| GPT-6 Astra | `gpt-6-astra` | $10 | $1 | $50 |
+| GPT-6.1 Sol | `gpt-6.1-sol` | $2 | $0.10 | $10 |
+| GPT-6 Luna | `gpt-6-luna` | $0.10 | $0.01 | $0.50 |
+| Gemini 3.1 Pro (preview) | `gemini-3.1-pro-preview` | $2 | $2* | $12 |
+| Gemini 3.8 Flash | `gemini-3.8-flash` | $1.50 | $1.50* | $7.50 |
+| Grok 4.7 | `grok-4.7` | $2 | $0.50 | $6 |
+| Grok 4.3 | `grok-4.3` | $1.25 | $0.20 | $2.50 |
+
+Claude also charges 1.25 times the input price to store something in its cache the first time (the other providers
+don't charge for that). \* Google's cached rate wasn't confirmed, so cached tokens are counted at the full price.
+These are the prices the app uses for its running total; they were read from each provider's pricing page in
+October 2026 and do change.
+
+</details>
 
 ## Speed
 
@@ -313,7 +376,7 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Cuelight.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, the Claude client (official Anthropic .NET SDK) and a client for the OpenAI-style chat API used by ChatGPT, Gemini, Grok and others. |
 | `src/Cuelight.App` | Avalonia UI (light/dark, violet-and-blue theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 326 core tests (including the real SDK against a local fake server) and 121 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `tests/` | 327 core tests (including the real SDK against a local fake server) and 121 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
 
 ## License
 

@@ -97,4 +97,26 @@ public class RepoDocsTests
                 Assert.False(pattern.IsMatch(text), $"{Path.GetRelativePath(Root(), file)} looks like it contains {name}");
         }
     }
+
+    [Fact]
+    public void The_prices_listed_in_the_readme_are_the_ones_the_app_uses_for_its_running_total()
+    {
+        var readme = File.ReadAllText(Path.Combine(Root(), "README.md"));
+        var rows = Regex.Matches(readme, @"^\|[^|]+\|\s*`([^`]+)`\s*\|\s*\$([0-9.]+)\*?\s*\|\s*\$([0-9.]+)\*?\s*\|\s*\$([0-9.]+)\s*\|\s*$", RegexOptions.Multiline);
+        Assert.True(rows.Count >= 10, "the README should list the price of every model that has one");
+        var listed = new HashSet<string>();
+        foreach (Match row in rows)
+        {
+            var id = row.Groups[1].Value;
+            Assert.True(Cuelight.Core.Pricing.TryGet(id, out var price), $"the README lists {id}, which the app has no price for");
+            Assert.Equal(price.Input, decimal.Parse(row.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture));
+            Assert.Equal(price.CacheRead, decimal.Parse(row.Groups[3].Value, System.Globalization.CultureInfo.InvariantCulture));
+            Assert.Equal(price.Output, decimal.Parse(row.Groups[4].Value, System.Globalization.CultureInfo.InvariantCulture));
+            listed.Add(id);
+            if (id.StartsWith("claude-")) Assert.Equal(price.Input * 1.25m, price.CacheWrite);   // "1.25 times the input price", as the README says
+        }
+        foreach (var provider in Cuelight.Core.Providers.All.Where(p => !p.IsFree && !p.IsCustom))
+            foreach (var model in provider.Models)
+                Assert.True(listed.Contains(model.Id), $"{model.Id} is offered in Settings but has no row in the README's price list");
+    }
 }
