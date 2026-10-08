@@ -5,7 +5,7 @@ namespace Cuelight.Core;
 /// <param name="CacheWrite">Input tokens stored in the cache by this request (billed a little above full price).</param>
 /// <param name="CacheRead">Input tokens served from the cache (billed at a fraction of full price).</param>
 /// <param name="Output">Tokens the AI wrote, including any it thought through first.</param>
-public sealed record TokenUsage(string Model, long Input, long CacheWrite, long CacheRead, long Output)
+public sealed record TokenUsage(string Model, long Input, long CacheWrite, long CacheRead, long Output, Provider Provider = Provider.Claude)
 {
     public long TotalInput => Input + CacheWrite + CacheRead;
 }
@@ -91,7 +91,8 @@ public sealed class UsageMeter
             _write += usage.CacheWrite;
             _read += usage.CacheRead;
             _output += usage.Output;
-            if (Pricing.TryGet(usage.Model, out var price)) _cost += price.Cost(usage);
+            if (Providers.Get(usage.Provider).IsFree) { }   // a free API: counted in tokens, and costs nothing
+            else if (Pricing.TryGet(usage.Model, out var price)) _cost += price.Cost(usage);
             else _unpriced = true; // counted in tokens, but there's no price to turn it into dollars
         }
     }

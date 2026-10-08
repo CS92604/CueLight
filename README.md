@@ -7,7 +7,7 @@
 
 A small Windows app that listens to whatever your PC is playing, watches a box you draw
 around any on-screen text, and uses an AI to tell you what to **say** and what to **type**,
-in words that sound like a person. Bring your own API key for **Claude, ChatGPT, Gemini or Grok**,
+in words that sound like a person. Bring your own API key for **Claude, ChatGPT, Gemini, Grok or NVIDIA** (which has a **free** key),
 or for any other service that speaks the OpenAI chat API (OpenRouter, Groq, a model running on
 your own PC with Ollama...).
 
@@ -20,7 +20,7 @@ your own PC with Ollama...).
 
 1. Download `Cuelight.exe` from the latest [release](../../releases/latest) and
    double-click it. It is one file: nothing to unzip or install, not even .NET.
-2. Choose your AI (Claude, ChatGPT, Gemini, Grok or another service) and paste its API key. The
+2. Choose your AI (Claude, ChatGPT, Gemini, Grok, NVIDIA or another service) and paste its API key. The
    welcome screen links to the page where each provider creates one. That's the only setup.
 3. The first launch downloads a speech model (about 140 MB, once). The status line shows progress.
 
@@ -111,7 +111,7 @@ screen as it is now.
 | Length / options | Brief · Short · Detailed; 1–3 options per section |
 | Reply language | Empty = match the other person |
 | About me / extra instructions | Free text: who you are, words to avoid… |
-| AI provider | Claude · ChatGPT · Gemini · Grok · Other (any OpenAI-compatible service). Each provider has its own saved key, so switching back needs nothing more. See [AI providers](#ai-providers). |
+| AI provider | Claude · ChatGPT · Gemini · Grok · NVIDIA (free) · Other (any OpenAI-compatible service). Each provider has its own saved key, so switching back needs nothing more. See [AI providers](#ai-providers). |
 | Model | The models listed for the chosen provider (Claude: Sonnet 5.5 recommended and the default, Opus 5.5 for the best replies at twice the cost, Haiku 5.5 the cheapest). Every provider but Claude also takes any model name typed in, since models are replaced often. |
 | Think before replying | Off by default, so a reply starts as soon as it can. On, the AI spends more effort on each reply: slower to start, better on hard or technical questions. |
 | Hide from screen sharing | Keeps every window of the app out of screen shares, recordings and screenshots. Windows 10 version 2004 or later. Off by default; see Privacy below. |
@@ -128,6 +128,7 @@ Changes are saved as you make them and apply to the next suggestion.
 | **ChatGPT** (OpenAI) | [platform.openai.com](https://platform.openai.com/api-keys) | GPT-6.1 Sol, GPT-6 Astra, GPT-6 Luna | A ChatGPT subscription doesn't include API use; the key comes from the API platform. |
 | **Gemini** (Google) | [aistudio.google.com](https://aistudio.google.com/apikey) | Gemini 3.8 Flash, Gemini 3.1 Pro (preview) | Called through Google's OpenAI-compatible address. |
 | **Grok** (xAI) | [console.x.ai](https://console.x.ai) | Grok 4.7, Grok 4.3 | |
+| **NVIDIA** | [build.nvidia.com](https://build.nvidia.com/settings/api-keys) | Llama 3.3 70B, Llama 3.2 11B Vision | **Free** (see below). Llama 3.3 70B can't read pictures, so Type needs the Vision one. |
 | **Other** | wherever the service says | the model name you type | Any service with an OpenAI-style `/chat/completions` address, for example `https://openrouter.ai/api/v1`, `https://api.groq.com/openai/v1` or `http://localhost:11434/v1` (Ollama on this PC, which needs no key). |
 
 Model names were current in October 2026. They change often, so Settings also takes any model name
@@ -135,6 +136,24 @@ you type; if a provider doesn't know it, the status line says so. A model has to
 Type to work (turn Type off for one that can't). The app asks for little or no thinking before a reply
 (see [Speed](#speed)); if a provider refuses one of the optional settings it sends, the app sends the
 request again without it and remembers that for the model.
+
+### Free options
+
+To try the app without paying:
+
+- **NVIDIA** (built in): a free key with a free NVIDIA developer account, from
+  [build.nvidia.com](https://build.nvidia.com/settings/api-keys). It is rate limited (about 40 requests a
+  minute is the figure usually quoted; NVIDIA doesn't publish exact limits) and meant for trying things
+  out, not for production. The cost counter says **Free**.
+- **Gemini**: Google AI Studio keys have a free tier for the Flash models (not the Pro ones), with limits
+  that Google sets and changes and that can be small, a daily request cap among them.
+- **Other**: OpenRouter's models whose names end in `:free`, Groq's free plan, or a model running on your own
+  PC with [Ollama](https://ollama.com), which needs no key and no internet.
+
+Free tiers have limits, and the app asks for a suggestion after nearly every sentence, so a small cap can
+run out quickly: turn **Auto-suggest** off to ask only when you press Send. Free services also differ in
+what they do with what you send them (some use it to improve their models), so keep sensitive
+conversations away from them and read their terms.
 
 The Claude connection is the one that has been used with a real account. The others follow each
 provider's published API and are tested against a local stand-in server, but not yet against the live
@@ -161,8 +180,8 @@ console.
 
 The app is built to keep the cost low, and shows a running estimate in the top-right corner of its
 window (rest the mouse on it for the number of requests and how much came from the cache). It uses the
-providers' published prices for the models listed in Settings; for any other model it counts tokens
-instead of dollars, and says the total is incomplete.
+providers' published prices for the models listed in Settings (NVIDIA's free API shows **Free**); for any
+other model it counts tokens instead of dollars, and says the total is incomplete.
 
 - **The default models are the middle ones**: Claude Sonnet 5.5 is half the price of Opus 5.5 and Haiku 5.5
   costs a twentieth of Sonnet; GPT-6.1 Sol, Gemini 3.8 Flash and Grok 4.7 are likewise each provider's
@@ -271,7 +290,7 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Cuelight.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, the Claude client (official Anthropic .NET SDK) and a client for the OpenAI-style chat API used by ChatGPT, Gemini, Grok and others. |
 | `src/Cuelight.App` | Avalonia UI (light/dark, warm theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 261 core tests (including the real SDK against a local fake server) and 118 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `tests/` | 265 core tests (including the real SDK against a local fake server) and 118 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
 
 ## Credits
 
@@ -285,8 +304,9 @@ libraries. Each component is under its own open-source license.
 ## Disclaimer
 
 Cuelight is an independent, unofficial project. It is **not affiliated with, endorsed by, sponsored by
-or connected to Anthropic, PBC**, the maker of Claude, **or to OpenAI, Google or xAI**. "Claude" and
+or connected to Anthropic, PBC**, the maker of Claude, **or to OpenAI, Google, xAI or NVIDIA**. "Claude" and
 "Claude Code" are trademarks of Anthropic; "ChatGPT" and "GPT" of OpenAI; "Gemini" of Google; "Grok" of
-xAI. They appear here only to say what the app works with and (Claude Code) how it was made. The app
+xAI; "NVIDIA" of NVIDIA Corporation; the names of the other companies and models mentioned belong to their
+owners. They appear here only to say what the app works with and (Claude Code) how it was made. The app
 contains no logos, fonts or other assets from any of them. You use it with your own API key for the
 provider you choose, and that provider bills the use to you under its own terms.

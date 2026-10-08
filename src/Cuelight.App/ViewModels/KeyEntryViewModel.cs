@@ -64,6 +64,7 @@ public sealed partial class KeyEntryViewModel : ObservableObject
         Provider.OpenAi => "OpenAI bills API use separately from a ChatGPT subscription. A suggestion costs a fraction of a dollar; the app shows an estimate.",
         Provider.Gemini => "Google bills Gemini API use through its own account, separate from any Gemini subscription. A suggestion costs a fraction of a dollar; the app shows an estimate.",
         Provider.Grok => "xAI bills API use separately from a Grok subscription. A suggestion costs a fraction of a dollar; the app shows an estimate.",
+        Provider.Nvidia => "NVIDIA's API catalog is free to try, within limits it sets (about 40 requests a minute is typical). It is meant for testing, and a free service may keep what you send it, so read NVIDIA's terms before relying on it.",
         _ => "The service bills you for its use, however it charges. The app shows an estimate when it knows the model's price, and the number of tokens when it doesn't.",
     };
 

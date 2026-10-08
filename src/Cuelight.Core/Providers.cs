@@ -4,7 +4,7 @@ namespace Cuelight.Core;
 /// Whose AI answers. Claude is called through Anthropic's own SDK (which lets the app use Claude's prompt
 /// memory); the others are called through the OpenAI-style chat API that they, and many other services, offer.
 /// </summary>
-public enum Provider { Claude, OpenAi, Gemini, Grok, Other }
+public enum Provider { Claude, OpenAi, Gemini, Grok, Nvidia, Other }
 
 /// <summary>What the app knows about one provider: where to get a key, where to send requests and which models to offer.</summary>
 /// <param name="Name">What the app calls it ("ChatGPT").</param>
@@ -13,9 +13,10 @@ public enum Provider { Claude, OpenAi, Gemini, Grok, Other }
 /// <param name="KeyHost">That page's address as shown to the user.</param>
 /// <param name="KeyHint">What the key box shows before anything is typed.</param>
 /// <param name="BaseUrl">Where chat requests go (OpenAI-style providers), or null: Claude uses its SDK, and "Other" is typed in.</param>
+/// <param name="IsFree">The provider's API is free to use (within limits it sets): the cost counter says "Free".</param>
 public sealed record ProviderInfo(
     Provider Id, string Name, string Company, string KeyUrl, string KeyHost, string KeyHint,
-    string? BaseUrl, string DefaultModel, IReadOnlyList<ModelChoice> Models, string Blurb)
+    string? BaseUrl, string DefaultModel, IReadOnlyList<ModelChoice> Models, string Blurb, bool IsFree = false)
 {
     public bool IsClaude => Id == Provider.Claude;
 
@@ -74,6 +75,22 @@ public static class Providers
             },
             "xAI's Grok models. You need an xAI API key."),
 
+        // build.nvidia.com: a free key comes with a free NVIDIA Developer Program account. It is rate limited (about 40
+        // requests a minute is the figure usually quoted; NVIDIA doesn't publish exact limits) and meant for trying
+        // things out, not for production.
+        new ProviderInfo(Provider.Nvidia, "NVIDIA", "NVIDIA",
+            "https://build.nvidia.com/settings/api-keys", "build.nvidia.com", "nvapi-…",
+            "https://integrate.api.nvidia.com/v1", "meta/llama-3.3-70b-instruct",
+            new[]
+            {
+                new ModelChoice("meta/llama-3.3-70b-instruct", "Llama 3.3 70B", "Free · text only",
+                    "Meta's Llama 3.3 70B on NVIDIA's free API catalog. Good replies, but it can't read pictures, so Type needs the vision model below."),
+                new ModelChoice("meta/llama-3.2-11b-vision-instruct", "Llama 3.2 11B Vision", "Free · reads pictures",
+                    "A smaller Llama that can also read pictures, so Type works. Its replies are weaker than the 70B's."),
+            },
+            "NVIDIA's API catalog: free to try with a free NVIDIA developer account. It is rate limited and meant for testing, and it offers open models such as Llama.",
+            IsFree: true),
+
         new ProviderInfo(Provider.Other, "Other", "the service you enter",
             "", "", "API key (if it needs one)",
             null, "", Array.Empty<ModelChoice>(),
@@ -88,6 +105,7 @@ public static class Providers
         key = (key ?? "").Trim();
         if (key.StartsWith("sk-ant-", StringComparison.Ordinal)) return Provider.Claude;
         if (key.StartsWith("xai-", StringComparison.Ordinal)) return Provider.Grok;
+        if (key.StartsWith("nvapi-", StringComparison.Ordinal)) return Provider.Nvidia;
         if (key.StartsWith("AIza", StringComparison.Ordinal)) return Provider.Gemini;
         if (key.StartsWith("sk-", StringComparison.Ordinal)) return Provider.OpenAi;
         return null;

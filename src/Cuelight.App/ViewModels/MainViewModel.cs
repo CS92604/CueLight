@@ -331,6 +331,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (u.Requests == 0) return "$0.00";
         if (u.Cost == 0 && u.Unpriced) return Tokens(u.TotalInput + u.Output);   // no price is known for the model: count tokens instead
+        if (u.Cost == 0) return "Free";                                           // a free API: nothing is charged
         var amount = u.Cost < 0.005m ? "<$0.01" : "$" + u.Cost.ToString("0.00", System.Globalization.CultureInfo.CurrentCulture);
         return "≈ " + amount + (u.Unpriced ? "+" : "");
     }
@@ -347,6 +348,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             : provider.IsCustom
                 ? "Your provider's own dashboard shows the exact amount."
                 : $"Your {provider.Company} account ({provider.KeyHost}) shows the exact amount.";
+        if (provider.IsFree)
+            return (u.Requests == 0
+                       ? $"{who}'s API is free, so nothing will be charged. "
+                       : $"{who}'s API is free, so nothing is being charged for the {u.Requests} request{(u.Requests == 1 ? "" : "s")} made since you opened the app. ")
+                 + "A free service limits how many requests it will answer; if it reports a limit, turn Auto-suggest off so the app asks less often.";
         if (u.Requests == 0)
             return $"Estimated cost of {who}'s suggestions since you opened the app. Nothing has been sent yet. " + exact;
         var share = (int)Math.Round(u.CachedShare * 100);

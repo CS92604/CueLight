@@ -20,7 +20,7 @@ public class KeyEntryProviderTests
     [Fact]
     public void The_providers_are_listed_in_the_order_of_the_enum_and_the_index_picks_one()
     {
-        Assert.Equal(new[] { "Claude", "ChatGPT", "Gemini", "Grok", "Other" }, KeyEntryViewModel.ProviderItems.Select(i => i.Label));
+        Assert.Equal(new[] { "Claude", "ChatGPT", "Gemini", "Grok", "NVIDIA", "Other" }, KeyEntryViewModel.ProviderItems.Select(i => i.Label));
         var entry = Entry();
         entry.ProviderIndex = 3;
         Assert.Equal(Provider.Grok, entry.Provider);
@@ -56,6 +56,13 @@ public class KeyEntryProviderTests
         entry.Provider = Provider.Grok;
         Assert.Equal("Get a key at console.x.ai", entry.GetKeyLabel);
 
+        entry.Provider = Provider.Nvidia;
+        Assert.Equal("NVIDIA API key", entry.KeyLabel);
+        Assert.Equal("nvapi-…", entry.KeyHint);
+        Assert.Equal("Get a key at build.nvidia.com", entry.GetKeyLabel);
+        Assert.Contains("only ever sent to NVIDIA", entry.PrivacyText);
+        Assert.Contains("free to try", entry.BillingText);
+
         entry.Provider = Provider.Other;
         Assert.Equal("API key (optional)", entry.KeyLabel);
         Assert.True(entry.ShowAddress);
@@ -88,6 +95,11 @@ public class KeyEntryProviderTests
         entry.Key = "sk-proj-abc";
         await entry.SubmitCommand.ExecuteAsync(null);
         Assert.Contains("looks like a ChatGPT key", entry.Error);
+
+        entry.Provider = Provider.OpenAi;
+        entry.Key = "nvapi-abc123";
+        await entry.SubmitCommand.ExecuteAsync(null);
+        Assert.Contains("looks like a NVIDIA key", entry.Error);
 
         Assert.Equal(0, checks);
         Assert.Null(accepted);
@@ -295,6 +307,14 @@ public class SettingsProviderTests
         Assert.Contains("provider's own dashboard", unknown);
 
         Assert.Contains("Anthropic's list prices", MainViewModel.CostTipFor(Usage(0.05m, false)));   // unchanged for Claude
+
+        // a free API: the counter says so, and the tip says what to do about its limits
+        Assert.Equal("Free", MainViewModel.CostLabel(new UsageSnapshot(4, 5_000, 0, 0, 300, 0m, false)));
+        var free = MainViewModel.CostTipFor(new UsageSnapshot(4, 5_000, 0, 0, 300, 0m, false), Providers.Get(Provider.Nvidia));
+        Assert.Contains("NVIDIA's API is free", free);
+        Assert.Contains("4 requests", free);
+        Assert.Contains("turn Auto-suggest off", free);
+        Assert.Contains("nothing will be charged", MainViewModel.CostTipFor(new UsageSnapshot(0, 0, 0, 0, 0, 0m, false), Providers.Get(Provider.Nvidia)));
     }
 }
 
@@ -319,11 +339,11 @@ public class ProviderScreenTests
         UiTests.Settle();
 
         var chips = win.GetVisualDescendants().OfType<ListBox>().First(l => l.Classes.Contains("segmented"));
-        Assert.Equal(5, chips.ItemCount);
+        Assert.Equal(6, chips.ItemCount);
         var labels = win.GetVisualDescendants().OfType<ListBoxItem>().Select(i => i.DataContext).OfType<ChoiceItem>().Select(c => c.Label).ToList();
-        Assert.Equal(new[] { "Claude", "ChatGPT", "Gemini", "Grok", "Other" }, labels);
+        Assert.Equal(new[] { "Claude", "ChatGPT", "Gemini", "Grok", "NVIDIA", "Other" }, labels);
         Assert.Equal(0, chips.SelectedIndex);
-        Assert.Equal(5, win.GetVisualDescendants().OfType<ListBoxItem>().Count(i => !string.IsNullOrWhiteSpace(TipFor(i))));
+        Assert.Equal(6, win.GetVisualDescendants().OfType<ListBoxItem>().Count(i => !string.IsNullOrWhiteSpace(TipFor(i))));
 
         Assert.Single(Visible<TextBox>(win));                       // only the key box
         Assert.Contains(Visible<Button>(win), b => b.Content as string == "Get a key at console.anthropic.com");

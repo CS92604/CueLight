@@ -175,7 +175,7 @@ public class OpenAiCompatibleSuggesterTests
         using var server = new FakeChatServer { Usage = (1000, 800, 50) };
         TokenUsage? seen = null;
         await Collect(Suggester(server), Req(onUsage: u => seen = u));
-        Assert.Equal(new TokenUsage("gpt-6.1-sol", 200, 0, 800, 50), seen);
+        Assert.Equal(new TokenUsage("gpt-6.1-sol", 200, 0, 800, 50, Provider.OpenAi), seen);
     }
 
     [Fact]
@@ -246,6 +246,69 @@ public class OpenAiCompatibleSuggesterTests
         Assert.Contains("ChatGPT", ex.Message);
         Assert.Equal(status, ex.Status);
         Assert.Equal(ex.Message, SuggesterErrors.Describe(ex));
+    }
+
+    [Fact]
+    public async Task NVIDIA_gets_the_settings_its_catalog_accepts_and_its_use_is_free()
+    {
+        using var server = new FakeChatServer { Usage = (900, 0, 40) };
+        TokenUsage? seen = null;
+        await Collect(Suggester(server, "nvapi-test"), Req(Provider.Nvidia, onUsage: u => seen = u));
+        var body = server.Requests.Single().Body;
+        Assert.Equal("meta/llama-3.3-70b-instruct", body.GetProperty("model").GetString());
+        Assert.True(body.TryGetProperty("max_tokens", out _));
+        Assert.False(body.TryGetProperty("max_completion_tokens", out _));
+        Assert.False(body.TryGetProperty("reasoning_effort", out _), "NVIDIA's catalog models have no reasoning-effort setting");
+        Assert.Equal(Provider.Nvidia, seen!.Provider);
+
+        var meter = new UsageMeter();
+        meter.Add(seen);
+        var u = meter.Snapshot();
+        Assert.Equal(0m, u.Cost);
+        Assert.False(u.Unpriced);                                   // free, not "unknown": the counter says Free
+        Assert.Equal(900, u.Input);
+        Assert.Equal(40, u.Output);
+        Assert.True(Providers.Get(Provider.Nvidia).IsFree);
+        Assert.False(Providers.Get(Provider.OpenAi).IsFree);
+    }
+
+    [Fact]
+    public async Task Hitting_a_free_limit_is_explained_for_NVIDIA_and_hinted_at_for_the_others()
+    {
+        using var nvidia = new FakeChatServer { Status = 429 };
+        var ex = await Assert.ThrowsAsync<ProviderApiException>(() => Collect(Suggester(nvidia), Req(Provider.Nvidia)));
+        Assert.Contains("free tier is rate limited", ex.Message);
+        Assert.Contains("Auto-suggest", ex.Message);
+
+        using var gemini = new FakeChatServer { Status = 429 };
+        var other = await Assert.ThrowsAsync<ProviderApiException>(() => Collect(Suggester(gemini), Req(Provider.Gemini)));
+        Assert.Contains("rate-limiting", other.Message);
+        Assert.Contains("free key has small limits", other.Message);
+    }
+
+    [Fact]
+    public async Task An_NVIDIA_key_is_checked_with_one_word_because_its_model_list_is_public()
+    {
+        using var refused = new FakeChatServer { Status = 401 };           // the list answers; the chat says the key is wrong
+        var (isOk, message) = await OpenAiCompatibleSuggester.ValidateKeyAsync(Provider.Nvidia, "nvapi-bad", null, baseUrl: refused.Url);
+        Assert.False(isOk);
+        Assert.Contains("NVIDIA didn't accept that key", message);
+        Assert.Equal(new[] { "/v1/models", "/v1/chat/completions" }, refused.Requests.Select(r => r.Path));
+        var probe = refused.Requests[1].Body;
+        Assert.Equal(1, probe.GetProperty("max_tokens").GetInt32());
+
+        using var good = new FakeChatServer();
+        Assert.True((await OpenAiCompatibleSuggester.ValidateKeyAsync(Provider.Nvidia, "nvapi-good", null, baseUrl: good.Url)).Ok);
+
+        foreach (var status in new[] { 404, 429, 400 })                   // the model gone, a busy service: the key itself is fine
+        {
+            using var busy = new FakeChatServer { Status = status };
+            Assert.True((await OpenAiCompatibleSuggester.ValidateKeyAsync(Provider.Nvidia, "nvapi-ok", null, baseUrl: busy.Url)).Ok, $"status {status}");
+        }
+
+        using var others = new FakeChatServer { Status = 401 };           // other providers are checked with the list only
+        Assert.True((await OpenAiCompatibleSuggester.ValidateKeyAsync(Provider.OpenAi, "sk-x", null, baseUrl: others.Url)).Ok);
+        Assert.Single(others.Requests);
     }
 
     [Fact]
@@ -375,7 +438,7 @@ public class ProviderSettingsTests
         Assert.True(other.IsCustom);
         Assert.Empty(other.Models);
         Assert.False(other.HasKeyPage);
-        Assert.Equal(5, Providers.All.Count);
+        Assert.Equal(6, Providers.All.Count);
     }
 
     [Theory]
@@ -383,6 +446,7 @@ public class ProviderSettingsTests
     [InlineData("sk-proj-abc123", Provider.OpenAi)]
     [InlineData("xai-abc123", Provider.Grok)]
     [InlineData("AIzaSyAbc123", Provider.Gemini)]
+    [InlineData("nvapi-AbC123", Provider.Nvidia)]
     public void A_key_is_recognised_by_how_it_starts(string key, Provider expected) =>
         Assert.Equal(expected, Providers.Detect("  " + key + " "));
 
@@ -493,6 +557,9 @@ public sealed class ProviderKeysTests : IDisposable
 
         Assert.True(File.Exists(Path.Combine(_dir, "api-key.bin")));
         Assert.True(File.Exists(Path.Combine(_dir, "api-key-openai.bin")));
+        keys.Set(Provider.Nvidia, "nvapi-three");
+        Assert.True(File.Exists(Path.Combine(_dir, "api-key-nvidia.bin")));
+        Assert.Equal("nvapi-three", keys.Get(Provider.Nvidia));
 
         var again = new ProviderKeys(_dir, protector);                         // a later start finds them
         Assert.Equal("sk-ant-one", again.Get(Provider.Claude));

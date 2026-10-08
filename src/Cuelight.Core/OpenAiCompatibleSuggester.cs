@@ -68,9 +68,9 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
         public static Quirks For(Provider provider) => new()
         {
             // OpenAI's newer models want max_completion_tokens; Gemini's address and most other services know max_tokens.
-            UseMaxTokens = provider is Provider.Gemini or Provider.Other,
+            UseMaxTokens = provider is Provider.Gemini or Provider.Nvidia or Provider.Other,
             // Other services mostly have no reasoning setting, and some refuse an unknown one: don't offer it there.
-            NoReasoningEffort = provider == Provider.Other,
+            NoReasoningEffort = provider is Provider.Nvidia or Provider.Other,
         };
 
         /// <summary>Change whatever the error names. False if there is nothing left to change.</summary>
@@ -190,7 +190,7 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
                     input = (Prompting.SystemPrompt.Length + front.Length + tail.Length) / 4;
                     output = chars / 4;
                 }
-                report(new TokenUsage(model, input, 0, cached, output));
+                report(new TokenUsage(model, input, 0, cached, output, settings.Provider));
             }
         }
 
@@ -335,7 +335,9 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
                 : $"{who} couldn't find the model “{model}” for this key. Pick another model in Settings.",
             429 when lower.Contains("quota") || lower.Contains("credit") || lower.Contains("billing") =>
                 $"{who} says this account is out of quota or credit. Add credit with them, or try another key.",
-            429 => $"{who} is rate-limiting this key right now. Try again in a moment.",
+            429 when info.Id == Provider.Nvidia =>
+                "NVIDIA's free tier is rate limited (about 40 requests a minute, and NVIDIA doesn't publish exact limits). Wait a moment, or turn Auto-suggest off so it asks less often.",
+            429 => $"{who} is rate-limiting this key right now. Try again in a moment. (A free key has small limits; turning Auto-suggest off makes fewer requests.)",
             >= 500 => $"{who}'s service had a problem. Try again in a moment.",
             400 when hadImage && (lower.Contains("image") || lower.Contains("vision") || lower.Contains("multimodal")) =>
                 $"“{model}” can't read pictures, so Type can't use it. Pick another model in Settings, or turn Type off.",
@@ -367,7 +369,7 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
     // -- checking a key -------------------------------------------------------------------------
 
     /// <summary>Cheap check that a key is accepted: asks the service for its model list, which costs nothing. A service
-    /// with no such list can't be checked, and is let through.</summary>
+    /// with no such list can't be checked, and is let through. NVIDIA, whose list is public, is asked for a single word.</summary>
     public static async Task<(bool Ok, string Message)> ValidateKeyAsync(
         Provider provider, string apiKey, string? address, HttpMessageHandler? handler = null, string? baseUrl = null, CancellationToken ct = default)
     {
@@ -383,13 +385,31 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
             http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
             limit.CancelAfter(CheckTimeout + TimeSpan.FromSeconds(5));
-            using var message = new HttpRequestMessage(HttpMethod.Get, root + "/models");
-            if (apiKey.Trim() is { Length: > 0 } k && k != ProviderKeys.NoKey) message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", k);
+            var bearer = apiKey.Trim() is { Length: > 0 } k && k != ProviderKeys.NoKey ? new AuthenticationHeaderValue("Bearer", k) : null;
+            using var message = new HttpRequestMessage(HttpMethod.Get, root + "/models") { Headers = { Authorization = bearer } };
             using var response = await http.SendAsync(message, limit.Token);
             var status = (int)response.StatusCode;
-            if (response.IsSuccessStatusCode || status is 404 or 405 or 501) return (true, "");   // 404/405: no model list to ask
-            var body = await ReadBodyAsync(response, limit.Token);
-            return (false, Failure(info, "", status, body, false).Message);
+            if (!response.IsSuccessStatusCode && status is not (404 or 405 or 501))   // 404/405: no model list to ask
+            {
+                var body = await ReadBodyAsync(response, limit.Token);
+                return (false, Failure(info, "", status, body, false).Message);
+            }
+
+            // NVIDIA lists its models to anyone, so a wrong key would pass the check above: ask for one word instead.
+            // (Only a refused key counts as wrong here; a busy service or an unknown model still means the key is fine.)
+            if (provider == Provider.Nvidia)
+            {
+                var ask = "{\"model\":\"" + info.DefaultModel + "\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}";
+                using var probe = new HttpRequestMessage(HttpMethod.Post, root + "/chat/completions")
+                {
+                    Content = new StringContent(ask, Encoding.UTF8, "application/json"),
+                    Headers = { Authorization = bearer },
+                };
+                using var answer = await http.SendAsync(probe, limit.Token);
+                if ((int)answer.StatusCode is 401 or 403)
+                    return (false, Failure(info, "", (int)answer.StatusCode, await ReadBodyAsync(answer, limit.Token), false).Message);
+            }
+            return (true, "");
         }
         catch (Exception ex)
         {
