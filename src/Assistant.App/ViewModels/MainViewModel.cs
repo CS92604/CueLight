@@ -47,7 +47,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private readonly Action<EngineEvent> _handler;
 
-    public void Dispose() => _engine.Event -= _handler;
+    public void Dispose()
+    {
+        _engine.Event -= _handler;
+        _liveTimer?.Stop();
+    }
 
     public ObservableCollection<TurnVm> Turns { get; } = new();
     public ObservableCollection<SectionVm> Sections { get; } = new();
@@ -90,6 +94,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowNothingYet));
     }
 
+    /// <summary>
+    /// How long between one live word showing and the next. The speech engine hands over a few words at a time; showing
+    /// them one by one at this pace (a little faster when many are waiting) makes the line read as live speech, not as
+    /// blocks. Zero shows each batch at once.
+    /// </summary>
+    public TimeSpan LiveWordInterval { get; set; } = TimeSpan.FromMilliseconds(35);
+
+    private string[] _liveWords = Array.Empty<string>();   // the words the engine has so far
+    private int _liveShown;                                // how many of them are on screen
+    private DispatcherTimer? _liveTimer;
+
     /// <summary>Takes the live words (and who is saying them) from the engine.</summary>
     private void RefreshLive()
     {
@@ -97,10 +112,41 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var me = _engine.LiveText(Speaker.Me);
         string? text = them ?? me;
         _liveWho = them is not null ? Speaker.Them : me is not null ? Speaker.Me : _engine.HearingWho ?? Speaker.Them;
-        LiveText = text ?? "";
+        SetLiveWords(text ?? "");
         RaiseLiveProperties();
     }
     partial void OnLiveTextChanged(string value) => RaiseLiveProperties();
+
+    private void SetLiveWords(string text)
+    {
+        _liveWords = text.Length == 0 ? Array.Empty<string>() : text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (_liveWords.Length == 0 || LiveWordInterval <= TimeSpan.Zero) _liveShown = _liveWords.Length;
+        else _liveShown = Math.Clamp(_liveShown, 1, _liveWords.Length);   // words already showing stay (even if reworded); the first shows at once
+        ShowLiveWords();
+        if (_liveShown >= _liveWords.Length) { _liveTimer?.Stop(); return; }
+        _liveTimer ??= new DispatcherTimer();
+        _liveTimer.Interval = LiveWordInterval;
+        _liveTimer.Tick -= OnLiveTick;
+        _liveTimer.Tick += OnLiveTick;
+        _liveTimer.Start();
+    }
+
+    /// <summary>How many of the live words the engine has are not on screen yet.</summary>
+    internal int LiveWordsWaiting => _liveWords.Length - _liveShown;
+
+    private void OnLiveTick(object? sender, EventArgs e) => AdvanceLiveWords();
+
+    /// <summary>Show the next live word, or several when many are waiting. The timer calls this.</summary>
+    internal void AdvanceLiveWords()
+    {
+        int waiting = _liveWords.Length - _liveShown;
+        if (waiting <= 0) { _liveTimer?.Stop(); return; }
+        _liveShown += Math.Clamp(waiting / 6, 1, waiting);   // a long queue is worked off faster, so it never falls far behind
+        ShowLiveWords();
+        if (_liveShown >= _liveWords.Length) _liveTimer?.Stop();
+    }
+
+    private void ShowLiveWords() => LiveText = string.Join(' ', _liveWords.Take(_liveShown));
     public bool HasSections => Sections.Count > 0;
 
     public string EmptyHint => TypeEnabled

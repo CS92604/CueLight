@@ -96,6 +96,7 @@ public class UiTests
             r.Engine.Start();
             r.Vm = new MainViewModel(r.Engine, r.Settings, t => { r.Copied.Add(t); return Task.CompletedTask; },
                 () => r.PickRegion(), () => { }, () => { }, () => { }, on => r.Recording.Add(on));
+            r.Vm.LiveWordInterval = TimeSpan.Zero;   // tests see each batch of live words at once; the reveal has tests of its own
             r.Window = new MainWindow { DataContext = r.Vm, Width = 440, Height = 780 };
             r.Window.Show();
             return r;
@@ -833,6 +834,54 @@ public class UiTests
         Pump(() => !rig.Vm.ShowLive);
         Assert.Single(rig.Vm.Turns);
         Assert.False(row.IsEffectivelyVisible);
+    }
+
+    [AvaloniaFact]
+    public void Live_words_are_revealed_a_few_at_a_time_and_never_wait_on_a_slow_batch()
+    {
+        using var rig = Rig.Make();
+        rig.Vm.LiveWordInterval = TimeSpan.FromMinutes(10);        // the timer never fires on its own: the test takes each step
+        rig.Engine.SetSpeaking(Speaker.Them, true);
+
+        rig.Engine.SetLive(Speaker.Them, "one two three four five");
+        Pump(() => rig.Vm.HasLiveText);
+        Assert.Equal("one", rig.Vm.LiveText);                       // the first word is there at once
+        Assert.Equal(4, rig.Vm.LiveWordsWaiting);
+        rig.Vm.AdvanceLiveWords();
+        Assert.Equal("one two", rig.Vm.LiveText);
+
+        rig.Engine.SetLive(Speaker.Them, "one two three four five six seven");   // the next batch: what is showing stays
+        Pump(() => rig.Vm.LiveWordsWaiting == 5);
+        Assert.Equal("one two", rig.Vm.LiveText);
+
+        rig.Engine.SetLive(Speaker.Them, "won two three four five six seven");   // an earlier word is corrected: it changes in place
+        Pump(() => rig.Vm.LiveText == "won two");
+
+        rig.Engine.SetLive(Speaker.Them, string.Join(' ', Enumerable.Range(1, 30).Select(i => $"w{i}")));   // a long queue is worked off faster
+        Pump(() => rig.Vm.LiveWordsWaiting == 28);
+        rig.Vm.AdvanceLiveWords();
+        Assert.True(rig.Vm.LiveWordsWaiting <= 24, "a queue of 28 words shows more than one per step");
+        int steps = 0;
+        while (rig.Vm.LiveWordsWaiting > 0 && steps++ < 40) rig.Vm.AdvanceLiveWords();
+        Assert.InRange(steps, 1, 20);                               // 24 words left take fewer than 24 steps
+        Assert.EndsWith("w30", rig.Vm.LiveText);
+
+        rig.Engine.SetLive(Speaker.Them, null);                      // the real transcript is in: the line goes at once
+        Pump(() => !rig.Vm.HasLiveText);
+        Assert.Equal(0, rig.Vm.LiveWordsWaiting);
+        rig.Vm.AdvanceLiveWords();                                   // a stray step does nothing
+        Assert.Equal("", rig.Vm.LiveText);
+    }
+
+    [AvaloniaFact]
+    public void The_reveal_timer_shows_the_words_on_its_own()
+    {
+        using var rig = Rig.Make();
+        rig.Vm.LiveWordInterval = TimeSpan.FromMilliseconds(20);
+        rig.Engine.SetSpeaking(Speaker.Them, true);
+        rig.Engine.SetLive(Speaker.Them, "can you start on Monday morning");
+        Pump(() => rig.Vm.LiveText == "can you start on Monday morning");
+        Assert.Equal(0, rig.Vm.LiveWordsWaiting);
     }
 
     [AvaloniaFact]

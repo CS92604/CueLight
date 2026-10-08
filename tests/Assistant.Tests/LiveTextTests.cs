@@ -30,28 +30,80 @@ public class LivePreviewAudioTests
         Assert.Null(seg.SnapshotSpeech());
     }
 
+    static void Feed(AudioIngest ingest, float[] audio)
+    {
+        for (int i = 0; i < audio.Length; i += 480) ingest.Feed(audio.AsSpan(i, Math.Min(480, audio.Length - i)));   // 30 ms at a time
+    }
+
     [Fact]
-    public void Previews_come_about_once_a_second_while_speech_goes_on_and_not_in_silence()
+    public void The_first_preview_comes_as_soon_as_it_is_speech_and_then_every_fifth_of_a_second()
     {
         var previews = new List<float[]>();
         var ingest = new AudioIngest(Rate, 1, _ => { });
         ingest.Partial += previews.Add;
 
-        void Feed(float[] audio)
-        {
-            for (int i = 0; i < audio.Length; i += 1600) ingest.Feed(audio.AsSpan(i, Math.Min(1600, audio.Length - i)));
-        }
-
-        Feed(Silence(1.0));
+        Feed(ingest, Silence(1.0));
         Assert.Empty(previews);
 
-        Feed(Tone(3.0));
-        Assert.InRange(previews.Count, 2, 4);                       // first after about half a second, then every second
-        Assert.True(previews.Zip(previews.Skip(1), (a, b) => b.Length > a.Length).All(x => x), "each preview holds more speech than the last");
+        Feed(ingest, Tone(0.2));
+        Assert.Empty(previews);                                     // not yet worth a look
+        Feed(ingest, Tone(0.2));
+        Assert.Single(previews);                                    // about 0.3 s in
 
-        int before = previews.Count;
-        Feed(Silence(2.0));
-        Assert.Equal(before, previews.Count);
+        Feed(ingest, Tone(2.6));                                    // 3 s of speech altogether
+        Assert.InRange(previews.Count, 10, 16);                     // one every ~0.2 s
+        Assert.True(previews.Zip(previews.Skip(1), (a, b) => b.Length > a.Length).All(x => x), "each preview holds more speech than the last");
+    }
+
+    [Fact]
+    public void A_pause_brings_one_last_look_so_the_final_words_show_and_then_silence_brings_nothing()
+    {
+        var previews = new List<float[]>();
+        var ingest = new AudioIngest(Rate, 1, _ => { });
+        ingest.Partial += previews.Add;
+
+        Feed(ingest, Silence(1.0));
+        Feed(ingest, Tone(1.0));                                    // between two previews: the last 0.1 s or so isn't in any yet
+        int whileSpeaking = previews.Count;
+        var lastWhileSpeaking = previews[^1];
+
+        Feed(ingest, Silence(0.1));
+        Assert.Equal(whileSpeaking, previews.Count);                // a short gap between words is not a pause
+
+        Feed(ingest, Silence(0.2));                                 // the pause has begun (but the sentence isn't over: 0.7 s needed)
+        Assert.Equal(whileSpeaking + 1, previews.Count);
+        Assert.True(previews[^1].Length > lastWhileSpeaking.Length, "the last look holds the speech the others missed");
+
+        Feed(ingest, Silence(2.0));
+        Assert.Equal(whileSpeaking + 1, previews.Count);            // and then nothing more until someone speaks again
+    }
+
+    [Fact]
+    public void Speech_that_is_already_fully_previewed_gets_no_extra_look_when_it_pauses()
+    {
+        var previews = new List<float[]>();
+        var ingest = new AudioIngest(Rate, 1, _ => { });
+        ingest.Partial += previews.Add;
+        Feed(ingest, Silence(0.96));                                // whole 30 ms frames, so the numbers below are exact
+        Feed(ingest, Tone(0.3));                                    // exactly the first preview: nothing newer to show
+        Assert.Single(previews);
+        Feed(ingest, Silence(1.0));
+        Assert.Single(previews);
+    }
+
+    [Fact]
+    public void The_segmenter_counts_the_quiet_since_the_last_voice()
+    {
+        var seg = new Segmenter();
+        Assert.Equal(0, seg.TrailingSilenceFrames);
+        seg.Feed(Tone(0.96));
+        Assert.Equal(0, seg.TrailingSilenceFrames);
+        seg.Feed(Silence(0.3));
+        Assert.Equal(10, seg.TrailingSilenceFrames);
+        seg.Feed(Tone(0.12));                                       // someone talks again
+        Assert.Equal(0, seg.TrailingSilenceFrames);
+        seg.Feed(Silence(1.0));                                     // and the sentence ends
+        Assert.Equal(0, seg.TrailingSilenceFrames);
     }
 
     [Fact]
@@ -216,6 +268,68 @@ public class LivePreviewPipelineTests
             // The turn appears before the preview goes, so the words never vanish for a moment.
             Assert.True(events.IndexOf(turn) < events.FindLastIndex(e => e.Kind == EngineEventKind.Live && e.Text is null));
         }
+    }
+
+    /// <summary>A speech engine with a quick preview pass, like the real one.</summary>
+    sealed class TwoSpeedStt : ISpeechToText
+    {
+        public readonly List<string> Calls = new();
+        public Task<string> TranscribeAsync(float[] audio, CancellationToken ct) { lock (Calls) Calls.Add("full"); return Task.FromResult("the full words"); }
+        public Task<string> PreviewAsync(float[] audio, CancellationToken ct) { lock (Calls) Calls.Add("quick"); return Task.FromResult("the quick words"); }
+    }
+
+    [Fact]
+    public void Live_words_use_the_quick_pass_and_the_transcript_uses_the_full_one()
+    {
+        var events = new List<EngineEvent>();
+        using var engine = NewEngine(events);
+        var stt = new TwoSpeedStt();
+        var mic = new Mic();
+        using var pipe = Pipe(engine, stt, mic);
+
+        mic.Speak(true);
+        mic.Preview(new float[1000]);
+        WaitUntil(() => engine.LiveText(Speaker.Them) == "the quick words");
+        mic.Speak(false);
+        mic.Finish(new float[2000]);
+        WaitUntil(() => { lock (events) return events.Any(e => e.Kind == EngineEventKind.Turn); });
+
+        lock (events) Assert.Equal("the full words", events.Single(e => e.Kind == EngineEventKind.Turn).Text);
+        Assert.Equal(new[] { "quick", "full" }, stt.Calls);
+    }
+
+    [Fact]
+    public void An_engine_without_a_quick_pass_previews_with_the_normal_one()
+    {
+        var events = new List<EngineEvent>();
+        using var engine = NewEngine(events);
+        var stt = new CountingStt();                         // knows only TranscribeAsync
+        var mic = new Mic();
+        using var pipe = Pipe(engine, stt, mic);
+
+        mic.Speak(true);
+        mic.Preview(new float[1500]);
+        WaitUntil(() => engine.LiveText(Speaker.Them) == "words 1500");
+    }
+
+    [Fact]
+    public void Previews_follow_close_behind_each_other_on_a_quick_engine()
+    {
+        var events = new List<EngineEvent>();
+        using var engine = NewEngine(events);
+        var stt = new CountingStt();
+        var mic = new Mic();
+        using var pipe = Pipe(engine, stt, mic);              // 20 ms rest
+
+        mic.Speak(true);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        for (int i = 1; i <= 5; i++)
+        {
+            int n = i * 100;
+            mic.Preview(new float[n]);
+            WaitUntil(() => engine.LiveText(Speaker.Them) == $"words {n}", 1000);
+        }
+        Assert.True(watch.ElapsedMilliseconds < 1000, $"five previews took {watch.ElapsedMilliseconds} ms");
     }
 
     [Fact]

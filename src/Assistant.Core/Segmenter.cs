@@ -23,6 +23,9 @@ public sealed class Segmenter
     /// <summary>How many 30 ms stretches of actual voice the speech in progress has had so far (pauses don't count).</summary>
     public int VoicedFrames => _active.Count > 0 ? _speech : 0;
 
+    /// <summary>How many 30 ms stretches of quiet there have been since the last voice (0 while nobody is speaking).</summary>
+    public int TrailingSilenceFrames => _active.Count > 0 ? _silence : 0;
+
     /// <summary>The audio of the speech in progress (everything since it began, at most the latest
     /// <paramref name="maxSeconds"/>), for a live preview. Null when nobody is speaking.</summary>
     public float[]? SnapshotSpeech(double maxSeconds = 25)

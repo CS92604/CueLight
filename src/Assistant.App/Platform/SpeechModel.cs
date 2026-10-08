@@ -148,11 +148,21 @@ public static class SpeechModel
 /// <summary>Whisper (whisper.cpp) speech recognition, running locally on the CPU.</summary>
 public sealed class WhisperSpeechToText : ISpeechToText, IDisposable
 {
+    // Live previews of up to this much speech use a second, lighter pass. Whisper normally looks at a fixed 30 seconds
+    // of audio however short the sentence is, which is most of the time a pass takes; the preview pass looks at 16
+    // (the model has 50 positions for each second of audio). Longer speech is previewed the normal way.
+    private const int PreviewMaxSamples = 15 * 16_000;
+    private const int PreviewAudioContext = 800;
+
     private readonly WhisperFactory _factory;
     private readonly WhisperProcessor _processor;
+    private WhisperProcessor? _preview;     // built the first time a preview needs it; only touched while holding _one
+    private bool _previewFailed;
     private readonly SemaphoreSlim _one = new(1, 1);
     private byte[]? _modelBytes;   // only when the model had to be read from memory
     private int _disposed;
+
+    private static int Threads => Math.Clamp(Environment.ProcessorCount / 2, 2, 8);
 
     public WhisperSpeechToText(string modelPath)
     {
@@ -178,7 +188,7 @@ public sealed class WhisperSpeechToText : ISpeechToText, IDisposable
         {
             var processor = factory.CreateBuilder()
                 .WithLanguage("en")
-                .WithThreads(Math.Clamp(Environment.ProcessorCount / 2, 2, 8))
+                .WithThreads(Threads)
                 .Build();
             return (factory, processor);
         }
@@ -195,12 +205,63 @@ public sealed class WhisperSpeechToText : ISpeechToText, IDisposable
         try
         {
             if (Volatile.Read(ref _disposed) == 1) return "";
-            var parts = new List<string>();
-            await foreach (var segment in _processor.ProcessAsync(audio16k, ct))
-                parts.Add(segment.Text.Trim());
-            return string.Join(" ", parts.Where(p => p.Length > 0));
+            return await Run(_processor, audio16k, ct);
         }
         finally { _one.Release(); }
+    }
+
+    /// <summary>The quick pass for live words: the same model, but looking at a fraction of the usual window, so it
+    /// finishes several times sooner. A little rougher, which doesn't matter: the real transcript replaces it.</summary>
+    public async Task<string> PreviewAsync(float[] audio16k, CancellationToken ct)
+    {
+        if (audio16k.Length > PreviewMaxSamples) return await TranscribeAsync(audio16k, ct);
+        await _one.WaitAsync(ct);
+        try
+        {
+            if (Volatile.Read(ref _disposed) == 1) return "";
+            if (PreviewProcessor() is { } quick)
+            {
+                try { return await Run(quick, audio16k, ct); }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _previewFailed = true;   // this PC can't run it: use the normal pass from now on
+                    AppLog.Warn($"The quick preview pass failed ({ex.Message}); previews use the normal one.");
+                }
+            }
+            return await Run(_processor, audio16k, ct);
+        }
+        finally { _one.Release(); }
+    }
+
+    private WhisperProcessor? PreviewProcessor()
+    {
+        if (_previewFailed) return null;
+        if (_preview is not null) return _preview;
+        try
+        {
+            _preview = _factory.CreateBuilder()
+                .WithLanguage("en")
+                .WithThreads(Threads)
+                .WithAudioContextSize(PreviewAudioContext)
+                .WithSingleSegment()
+                .WithNoContext()
+                .WithTemperatureInc(0f)   // no slower second tries: a rough preview is fine
+                .Build();
+        }
+        catch (Exception ex)
+        {
+            _previewFailed = true;   // e.g. not enough memory for a second set of working buffers
+            AppLog.Warn($"The quick preview pass isn't available ({ex.Message}); previews use the normal one.");
+        }
+        return _preview;
+    }
+
+    private static async Task<string> Run(WhisperProcessor processor, float[] audio16k, CancellationToken ct)
+    {
+        var parts = new List<string>();
+        await foreach (var segment in processor.ProcessAsync(audio16k, ct))
+            parts.Add(segment.Text.Trim());
+        return string.Join(" ", parts.Where(p => p.Length > 0));
     }
 
     /// <summary>Frees the model once any transcription in progress is done: freeing it underneath
@@ -213,6 +274,7 @@ public sealed class WhisperSpeechToText : ISpeechToText, IDisposable
             await _one.WaitAsync();
             try
             {
+                _preview?.Dispose();
                 _processor.Dispose();
                 _factory.Dispose();
                 _modelBytes = null;
@@ -257,6 +319,23 @@ public sealed class SwappableSpeechToText : ISpeechToText, IDisposable
         catch when (model.IsFaulted)
         {
             return ""; // loading failed: the host already told the user once, with a Retry button
+        }
+    }
+
+    public async Task<string> PreviewAsync(float[] audio16k, CancellationToken ct)
+    {
+        var model = _current;
+        try
+        {
+            return await (await model.WaitAsync(ct)).PreviewAsync(audio16k, ct);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return "";
+        }
+        catch when (model.IsFaulted)
+        {
+            return "";
         }
     }
 

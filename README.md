@@ -56,9 +56,13 @@ Then:
 
 - **Live words.** While someone is speaking, the **Conversation** box shows what they are saying as
   they say it (in grey, with three pulsing dots), and the finished transcript replaces it. The
-  speech so far is re-read about once a second whenever the speech model has nothing more
-  important to do (a finished sentence always goes first), so it uses some extra processor time
-  while people talk; on a slow PC choose **Fast** under Speech recognition.
+  first words show after about a third of a second of speech and the line is refreshed several
+  times a second, appearing word by word. Each refresh is a quick pass of the speech model over
+  the speech so far (it looks at a smaller window than the final transcript does, which is what
+  makes it fast), run whenever the model has nothing more important to do; a finished sentence
+  always goes first. It uses some extra processor time while people talk; on a slow PC choose
+  **Fast** under Speech recognition. Speech longer than 15 seconds without a pause is previewed
+  with the full pass, which is slower.
 - After someone finishes speaking you get up to a few options to **say**, each with a **Copy**
   button. If they asked you something, these answer it directly and briefly, in your voice.
 - **ANSWER.** When the other person asks a question, sets a riddle or leaves a sentence hanging, a
@@ -225,4 +229,4 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Assistant.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
 | `src/Assistant.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 202 core tests (including the real SDK against a local fake server) and 93 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `tests/` | 208 core tests (including the real SDK against a local fake server) and 97 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |

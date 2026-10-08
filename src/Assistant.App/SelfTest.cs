@@ -124,6 +124,24 @@ internal static class SelfTest
         Line($"ok    transcribed {audio.Length / 16000.0:0.0} s of audio: \"{TranscriptCleaner.Clean(text)}\"");
         if (expect is not null && !text.Contains(expect, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException($"expected the transcript to contain \"{expect}\"");
+
+        // The quick pass behind the live words must hear the same words, and be quicker. (The first run of each
+        // pays for loading things, so each is timed on its second go.)
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        string preview = "";
+        long normalMs = 0, quickMs = 0;
+        for (int run = 0; run < 2; run++)
+        {
+            clock.Restart();
+            stt.TranscribeAsync(audio, CancellationToken.None).GetAwaiter().GetResult();
+            normalMs = clock.ElapsedMilliseconds;
+            clock.Restart();
+            preview = stt.PreviewAsync(audio, CancellationToken.None).GetAwaiter().GetResult();
+            quickMs = clock.ElapsedMilliseconds;
+        }
+        Line($"ok    live-words pass: {quickMs} ms against {normalMs} ms for the normal pass: \"{TranscriptCleaner.Clean(preview)}\"");
+        if (expect is not null && !preview.Contains(expect, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"the live-words pass didn't hear \"{expect}\"");
     }
 
     /// <summary>A WAV file as mono 16 kHz samples, padded with a little silence like a real recording.</summary>

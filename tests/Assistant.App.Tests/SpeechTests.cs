@@ -47,6 +47,32 @@ public class SwappableSpeechTests
         Assert.Equal("two", await swap.TranscribeAsync(new float[10], CancellationToken.None));
     }
 
+    sealed class TwoSpeed : ISpeechToText
+    {
+        public Task<string> TranscribeAsync(float[] a, CancellationToken ct) => Task.FromResult("full");
+        public Task<string> PreviewAsync(float[] a, CancellationToken ct) => Task.FromResult("quick");
+    }
+
+    [Fact]
+    public async Task Live_word_previews_reach_the_models_quick_pass()
+    {
+        var swap = new SwappableSpeechToText();
+        swap.Set(Task.FromResult<ISpeechToText>(new TwoSpeed()));
+        Assert.Equal("quick", await swap.PreviewAsync(new float[10], CancellationToken.None));
+        Assert.Equal("full", await swap.TranscribeAsync(new float[10], CancellationToken.None));
+
+        swap.Set(Task.FromResult<ISpeechToText>(new Echo { Reply = "plain" }));   // an engine without one previews normally
+        Assert.Equal("plain", await swap.PreviewAsync(new float[10], CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task A_failed_model_load_gives_no_preview_and_no_error()
+    {
+        var swap = new SwappableSpeechToText();
+        swap.Set(Task.FromException<ISpeechToText>(new IOException("no internet")));
+        Assert.Equal("", await swap.PreviewAsync(new float[10], CancellationToken.None));
+    }
+
     [Fact]
     public async Task Cancelling_the_caller_still_cancels()
     {

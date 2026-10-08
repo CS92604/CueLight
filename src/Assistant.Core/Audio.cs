@@ -25,6 +25,12 @@ public interface IAudioSource : IDisposable
 public interface ISpeechToText
 {
     Task<string> TranscribeAsync(float[] audio16k, CancellationToken ct);
+
+    /// <summary>
+    /// A quicker pass for the live words, used while someone is still speaking; the real transcript replaces it.
+    /// An engine with no cheaper way to do it just transcribes.
+    /// </summary>
+    Task<string> PreviewAsync(float[] audio16k, CancellationToken ct) => TranscribeAsync(audio16k, ct);
 }
 
 /// <summary>
@@ -44,11 +50,13 @@ public sealed class AudioIngest
     /// <summary>Speech started (true) or ended (false) on this device.</summary>
     public event Action<bool>? SpeakingChanged;
 
-    /// <summary>While speech goes on: the speech so far, first after about half a second and then every second.</summary>
+    /// <summary>While speech goes on: the speech so far, as soon as there is enough to be speech (about 0.3 s) and then
+    /// every fifth of a second, plus once more when a pause begins. (The listener only ever works on the newest.)</summary>
     public event Action<float[]>? Partial;
 
-    // Voiced 30 ms frames of new speech needed before the next preview: about half a second for the first, then a second.
-    private const int FirstPartialFrames = 17, PartialFrames = 33;
+    // Voiced 30 ms frames of new speech needed before the next preview, and how much quiet after speech counts as
+    // the start of a pause (a last look, so the final words show before the finished transcript is ready).
+    private const int FirstPartialFrames = 10, PartialFrames = 7, PauseLookFrames = 5;
     private int _voicedAtLastPartial, _framesForNextPartial = FirstPartialFrames;
 
     public AudioIngest(int sampleRate, int channels, Action<float[]> onUtterance, Func<double>? clock = null)
@@ -101,7 +109,9 @@ public sealed class AudioIngest
         // Counting frames of real voice (not time) means a trailing pause never triggers another preview of the same words.
         int voiced = _segmenter.VoicedFrames;
         if (voiced < _voicedAtLastPartial) _voicedAtLastPartial = 0;   // a new sentence began inside this chunk
-        if (voiced - _voicedAtLastPartial < _framesForNextPartial) return;
+        int fresh = voiced - _voicedAtLastPartial;
+        bool pauseBegan = fresh > 0 && _segmenter.TrailingSilenceFrames >= PauseLookFrames;
+        if (fresh < _framesForNextPartial && !pauseBegan) return;
         _voicedAtLastPartial = voiced;
         _framesForNextPartial = PartialFrames;
         if (_segmenter.SnapshotSpeech() is { } speech) Partial?.Invoke(speech);
@@ -134,10 +144,10 @@ public static partial class TranscriptCleaner
 /// Transcribes utterances one at a time and feeds them to the engine. Utterances that arrive
 /// while the speech model is still loading wait (a small backlog is kept, oldest dropped).
 ///
-/// It also keeps a live preview: while someone is speaking, the speech so far is transcribed again about
-/// once a second (whenever the speech model has nothing more important to do) and handed to the engine as
-/// <see cref="Engine.SetLive"/>, so the words show up as they are said. A finished utterance always goes
-/// first, and cuts a preview short. The preview is replaced by the real transcript when that is ready.
+/// It also keeps a live preview: while someone is speaking, the speech so far is run through the speech model's
+/// quick preview pass again and again (whenever the speech model has nothing more important to do) and handed to
+/// the engine as <see cref="Engine.SetLive"/>, so the words show up as they are said. A finished utterance always
+/// goes first, and cuts a preview short. The preview is replaced by the real transcript when that is ready.
 /// </summary>
 public sealed class AudioPipeline : IDisposable
 {
@@ -159,9 +169,12 @@ public sealed class AudioPipeline : IDisposable
     private DateTime _partialAllowedAfter = DateTime.MinValue;
     private readonly SemaphoreSlim _work = new(0);
 
-    /// <summary>The least time between two preview passes. A pass that took longer makes the next wait that long too,
-    /// so on a slow PC the preview never takes more than half of the speech model's time.</summary>
-    public TimeSpan PreviewMinGap { get; init; } = TimeSpan.FromMilliseconds(700);
+    /// <summary>The least rest between two preview passes. After a slow pass the rest is longer (a third of how long
+    /// the pass took), so on a slow PC the preview leaves the speech model some time for everything else, while on
+    /// a quick one the next pass follows right behind the last.</summary>
+    public TimeSpan PreviewMinGap { get; init; } = TimeSpan.FromMilliseconds(40);
+
+    private const double RestAfterPass = 0.33;
 
     /// <summary>Shown when speech arrives faster than this PC can transcribe it and the oldest is skipped.</summary>
     public const string FallingBehind =
@@ -303,7 +316,7 @@ public sealed class AudioPipeline : IDisposable
 
         var started = _now();
         string text;
-        try { text = TranscriptCleaner.Clean(await stt.TranscribeAsync(audio, cts.Token)); }
+        try { text = TranscriptCleaner.Clean(await stt.PreviewAsync(audio, cts.Token)); }
         catch (OperationCanceledException) when (!_cts.IsCancellationRequested) { return; }  // a finished utterance came in; it goes first
         catch (OperationCanceledException) { throw; }
         catch (Exception) { return; }   // a preview is a nicety; the real transcription reports real problems
@@ -314,7 +327,8 @@ public sealed class AudioPipeline : IDisposable
         }
 
         var took = _now() - started;
-        lock (_live) _partialAllowedAfter = _now() + (took > PreviewMinGap ? took : PreviewMinGap);
+        var rest = TimeSpan.FromTicks((long)(took.Ticks * RestAfterPass));
+        lock (_live) _partialAllowedAfter = _now() + (rest > PreviewMinGap ? rest : PreviewMinGap);
         bool stillRelevant;
         lock (_live) stillRelevant = _speaking.Contains(who);
         if (text.Length > 0 && stillRelevant) _engine.SetLive(who, text);
