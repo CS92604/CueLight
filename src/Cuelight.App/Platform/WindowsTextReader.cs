@@ -19,8 +19,19 @@ public sealed class WindowsTextReader : ITextReader
 
     public bool IsAvailable => _engine.Value is not null;
 
-    /// <summary>Starts loading the recognition engine in the background, so the first read isn't the slow one.</summary>
-    public void WarmUp() => _ = Task.Run(() => _engine.Value);
+    /// <summary>Loads the recognition engine and reads a blank picture, in the background, so the first real read isn't the slow
+    /// one (on a test machine that first read took a few hundred milliseconds, and later ones a few).</summary>
+    public void WarmUp() => _ = Task.Run(async () =>
+    {
+        try
+        {
+            if (_engine.Value is null) return;
+            var blank = new byte[64 * 64 * 4];
+            Array.Fill(blank, (byte)255);
+            await ReadAsync(blank, 64, 64, CancellationToken.None);
+        }
+        catch (Exception ex) { AppLog.Warn($"Warming up text recognition failed: {ex.Message}"); }
+    });
 
     private static OcrEngine? Create()
     {

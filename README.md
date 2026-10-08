@@ -125,7 +125,7 @@ When Type is on, the text area has to reach the AI somehow. Settings → **Readi
 | What reaches the AI | The words in the area, read on your PC with Windows' own text recognition | An actual picture of the area, sent each time it changes |
 | What leaves your PC | Only text | A picture, with everything in it: names, avatars, anything else in the area |
 | Cost | Less: roughly 150–400 tokens of text, against about 500 for a chat-sized picture | More, and a larger area costs more |
-| Speed | Skips making and uploading a picture and the provider's picture processing, but first spends a moment reading the words on your PC. The saving is small and depends on your PC and provider, so try both. | Nothing to read first: the picture goes straight out |
+| Speed | Skips making and uploading a picture and the provider's picture processing. Reading the words takes a few milliseconds once warm (5–20 ms for a small area on a hosted Windows test machine; the first read after the app starts takes a few hundred, which it does in advance). How much sooner the reply starts depends on your provider and connection and hasn't been measured end to end, so try both. | Nothing to read first: the picture goes straight out |
 | What the AI can tell | Only the words, top to bottom. It works out who wrote what from names and wording, can't see colours, alignment or images, and a misread word can slip in | Everything you see, so who wrote each message is clear even in a chat with bubbles on each side |
 | Models | Any model, including ones that can't read pictures | Only models that can read pictures |
 | Needs | A text-recognition language installed in Windows (usually already there). If it isn't, the app sends a picture instead and says so | Nothing extra |
@@ -321,8 +321,8 @@ Haiku reply without thinking first and the other providers are asked for low rea
 **Think before replying** gives the AI more room to think), and the smaller models are the quickest; models
 that always reason, like Claude Opus 5.5 and Grok 4.7, start a little slower. If transcribing is the
 slow part on your PC, choose **Fast** under Speech recognition. For the text area, **Fast** reading under
-[Reading the text area](#fast-or-detailed) swaps making and uploading a picture for reading its words on your PC; the
-difference is small and varies, so it is worth trying both.
+[Reading the text area](#fast-or-detailed) swaps making and uploading a picture for reading its words on your PC, which
+takes only milliseconds. How much sooner the AI starts depends on your provider and connection, so it is worth trying both.
 
 ## Privacy and responsible use
 
