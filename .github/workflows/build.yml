@@ -10,11 +10,34 @@ on:
       tag:
         description: 'Release tag to create or update, e.g. v0.2.0 (leave empty to only build)'
         required: false
+      delete_tags:
+        description: 'TEMPORARY clean-up: space-separated release tags to delete (with their tags); builds nothing'
+        required: false
   release:
     types: [published]
 
 jobs:
+  cleanup:
+    if: ${{ inputs.delete_tags != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Delete the releases and their tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAGS: ${{ inputs.delete_tags }}
+        run: |
+          for tag in $TAGS; do
+            echo "Deleting $tag"
+            gh release delete "$tag" --cleanup-tag --yes || echo "Could not delete $tag"
+          done
+          echo "Releases left:"
+          gh release list
+
   test:
+    if: ${{ inputs.delete_tags == '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
