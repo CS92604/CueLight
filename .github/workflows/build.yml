@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - run: dotnet test ClaudeLiveAssistant.sln -c Release
+      - run: dotnet test Cuelight.sln -c Release
 
   windows:
     needs: test
@@ -41,7 +41,7 @@ jobs:
       # The same tests again on Windows itself (the first job runs them on Linux).
       - name: Test on Windows
         shell: pwsh
-        run: dotnet test ClaudeLiveAssistant.sln -c Release
+        run: dotnet test Cuelight.sln -c Release
 
       - name: Work out the tag and version
         id: ver
@@ -89,18 +89,18 @@ jobs:
       - name: Publish
         shell: pwsh
         run: |
-          dotnet publish src/Assistant.App -c Release -r win-x64 `
+          dotnet publish src/Cuelight.App -c Release -r win-x64 `
             -p:Version=${{ steps.ver.outputs.version }} -p:VcRuntimeDir="$PWD\vc-runtime" -o publish
           $files = @(Get-ChildItem publish -Recurse -File)
           $files | Format-Table Name, Length
-          if ($files.Count -ne 1 -or $files[0].Name -ne 'ClaudeLiveAssistant.exe') {
-            throw "The publish folder must hold exactly one file, ClaudeLiveAssistant.exe, but has: $($files.Name -join ', ')"
+          if ($files.Count -ne 1 -or $files[0].Name -ne 'Cuelight.exe') {
+            throw "The publish folder must hold exactly one file, Cuelight.exe, but has: $($files.Name -join ', ')"
           }
 
       # What gets unpacked at run time must not need anything a clean PC lacks. Checked below, after the
       # self-test has unpacked it, by reading the import tables of every native library.
 
-      # Real-Windows checks of the things that differ between PCs (see src/Assistant.App/SelfTest.cs):
+      # Real-Windows checks of the things that differ between PCs (see src/Cuelight.App/SelfTest.cs):
       # the speech engine's native libraries, real speech into text, drawing the windows, hiding them
       # from screen capture. Runs the engine twice: normally, and as a CPU without AVX2 would.
       - name: Record some speech with Windows' own voice
@@ -124,7 +124,7 @@ jobs:
         run: |
           $clean = Join-Path $env:RUNNER_TEMP 'clean-folder'
           New-Item $clean -ItemType Directory | Out-Null
-          Copy-Item publish\ClaudeLiveAssistant.exe $clean
+          Copy-Item publish\Cuelight.exe $clean
           $env:DOTNET_BUNDLE_EXTRACT_BASE_DIR = Join-Path $env:RUNNER_TEMP 'bundle-extract'
           # A model folder with non-English letters in its name, as a user called "José" or "Иван" would have.
           $unicode = Join-Path $env:RUNNER_TEMP ('Model-' + [string]::new([char[]](0x00C9, 0x00F1, 0x0416, 0x0434)))
@@ -134,7 +134,7 @@ jobs:
             $arguments = @('--self-test', '--require-vc', '--out', "$PWD\selftest-$mode", '--models', $models)
             if (Test-Path selftest.wav) { $arguments += @('--wav', "$PWD\selftest.wav", '--expect', 'monday') }
             if ($mode -eq 'noavx') { $arguments += '--noavx' }
-            $p = Start-Process "$clean\ClaudeLiveAssistant.exe" -ArgumentList $arguments -Wait -PassThru
+            $p = Start-Process "$clean\Cuelight.exe" -ArgumentList $arguments -Wait -PassThru
             Write-Host "===== self-test ($mode), exit code $($p.ExitCode) ====="
             if (Test-Path "selftest-$mode\self-test.txt") { Get-Content "selftest-$mode\self-test.txt" } else { Write-Host 'no report was written' }
             if ($p.ExitCode -ne 0) { $failed = $true }
@@ -148,8 +148,8 @@ jobs:
         shell: pwsh
         run: |
           Write-Host 'Speech engine files:'
-          Get-ChildItem "$env:LOCALAPPDATA\Claude Live Assistant\runtime" -Recurse -File | Format-Table FullName, Length
-          python packaging\check-deps.py "$env:LOCALAPPDATA\Claude Live Assistant\runtime"
+          Get-ChildItem "$env:LOCALAPPDATA\Cuelight\runtime" -Recurse -File | Format-Table FullName, Length
+          python packaging\check-deps.py "$env:LOCALAPPDATA\Cuelight\runtime"
           python packaging\check-deps.py (Join-Path $env:RUNNER_TEMP 'bundle-extract')
 
       - uses: actions/upload-artifact@v4
@@ -165,16 +165,16 @@ jobs:
         id: sum
         shell: pwsh
         run: |
-          $hash = (Get-FileHash publish\ClaudeLiveAssistant.exe -Algorithm SHA256).Hash.ToLower()
+          $hash = (Get-FileHash publish\Cuelight.exe -Algorithm SHA256).Hash.ToLower()
           "hash=$hash" >> $env:GITHUB_OUTPUT
-          Get-Item publish\ClaudeLiveAssistant.exe | Format-List Name, Length
+          Get-Item publish\Cuelight.exe | Format-List Name, Length
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ClaudeLiveAssistant
-          path: publish/ClaudeLiveAssistant.exe
+          name: Cuelight
+          path: publish/Cuelight.exe
 
-      # The release holds one file: ClaudeLiveAssistant.exe. Its SHA-256 is in the notes.
+      # The release holds one file: Cuelight.exe. Its SHA-256 is in the notes.
       - name: Attach to the release
         if: steps.ver.outputs.tag != ''
         shell: pwsh
@@ -184,7 +184,7 @@ jobs:
           HASH: ${{ steps.sum.outputs.hash }}
         run: |
           @"
-          **Download ``ClaudeLiveAssistant.exe`` and double-click it.** That is the whole app: one file, nothing to install or unzip.
+          **Download ``Cuelight.exe`` and double-click it.** That is the whole app: one file, nothing to install or unzip.
           Paste your Claude API key on first launch; that is the only setup.
 
           Claude's API is billed by Anthropic separately from a Claude subscription. The app uses Sonnet 5.5 by default, remembers what it has already read so repeat requests are cheap, and shows a running cost estimate in its top-right corner. See "What it costs" in the README.
@@ -192,14 +192,14 @@ jobs:
           Windows 10 or 11, 64-bit. Windows may say "Windows protected your PC" because the app isn't code-signed yet:
           choose **More info**, then **Run anyway**. The first start unpacks the speech engine and downloads a one-time speech model (about 140 MB).
 
-          SHA-256 of ``ClaudeLiveAssistant.exe``: ``$($env:HASH)``
+          SHA-256 of ``Cuelight.exe``: ``$($env:HASH)``
+
+          Cuelight is an independent, unofficial project. It is not affiliated with or endorsed by Anthropic. A very large majority of it was made with Claude Code.
           "@ | Out-File notes.md -Encoding utf8
           gh release view $env:TAG *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $env:TAG publish\ClaudeLiveAssistant.exe --clobber
-            # Drop assets of the old zip format, if this release had them.
-            foreach ($old in 'ClaudeLiveAssistant-win-x64.zip', 'ClaudeLiveAssistant-win-x64.zip.sha256') { gh release delete-asset $env:TAG $old --yes *> $null }
+            gh release upload $env:TAG publish\Cuelight.exe --clobber
             gh release edit $env:TAG --notes-file notes.md
           } else {
-            gh release create $env:TAG publish\ClaudeLiveAssistant.exe --title "Claude Live Assistant $env:TAG" --notes-file notes.md --target $env:GITHUB_SHA
+            gh release create $env:TAG publish\Cuelight.exe --title "Cuelight $env:TAG" --notes-file notes.md --target $env:GITHUB_SHA
           }

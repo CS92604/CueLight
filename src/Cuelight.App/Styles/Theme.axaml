@@ -1,0 +1,550 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Warm neutrals, a clay accent and serif headings: the Claude look, in light and dark. -->
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="Bg" Color="#FAF9F5" />
+          <SolidColorBrush x:Key="Surface" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="SurfaceAlt" Color="#F2F0E8" />
+          <SolidColorBrush x:Key="Border" Color="#E7E4D9" />
+          <SolidColorBrush x:Key="BorderStrong" Color="#D5D1C3" />
+          <SolidColorBrush x:Key="Text" Color="#1F1E1C" />
+          <SolidColorBrush x:Key="TextMuted" Color="#6F6D66" />
+          <SolidColorBrush x:Key="TextFaint" Color="#9A978D" />
+          <SolidColorBrush x:Key="Accent" Color="#D97757" />
+          <SolidColorBrush x:Key="AccentHover" Color="#CC6B4B" />
+          <SolidColorBrush x:Key="AccentPressed" Color="#BE5F40" />
+          <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AccentSoft" Color="#F8E9E2" />
+          <SolidColorBrush x:Key="AccentSoftHover" Color="#F3DACE" />
+          <SolidColorBrush x:Key="AccentText" Color="#B0502F" />
+          <SolidColorBrush x:Key="InfoSoft" Color="#E8EEF4" />
+          <SolidColorBrush x:Key="InfoText" Color="#3E5A78" />
+          <SolidColorBrush x:Key="Success" Color="#5B8F62" />
+          <SolidColorBrush x:Key="SuccessSoft" Color="#E5EFE3" />
+          <SolidColorBrush x:Key="SuccessText" Color="#3B6B44" />
+          <SolidColorBrush x:Key="Danger" Color="#C4452F" />
+          <SolidColorBrush x:Key="DangerSoft" Color="#FBE9E5" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="Bg" Color="#262624" />
+          <SolidColorBrush x:Key="Surface" Color="#30302E" />
+          <SolidColorBrush x:Key="SurfaceAlt" Color="#3A3936" />
+          <SolidColorBrush x:Key="Border" Color="#43423E" />
+          <SolidColorBrush x:Key="BorderStrong" Color="#55544F" />
+          <SolidColorBrush x:Key="Text" Color="#F4F3EE" />
+          <SolidColorBrush x:Key="TextMuted" Color="#AEACA3" />
+          <SolidColorBrush x:Key="TextFaint" Color="#85837B" />
+          <SolidColorBrush x:Key="Accent" Color="#D97757" />
+          <SolidColorBrush x:Key="AccentHover" Color="#E58968" />
+          <SolidColorBrush x:Key="AccentPressed" Color="#C96A4B" />
+          <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AccentSoft" Color="#4A3A33" />
+          <SolidColorBrush x:Key="AccentSoftHover" Color="#5A453C" />
+          <SolidColorBrush x:Key="AccentText" Color="#EFA88C" />
+          <SolidColorBrush x:Key="InfoSoft" Color="#34404D" />
+          <SolidColorBrush x:Key="InfoText" Color="#A8C1DA" />
+          <SolidColorBrush x:Key="Success" Color="#7DB284" />
+          <SolidColorBrush x:Key="SuccessSoft" Color="#2F3D32" />
+          <SolidColorBrush x:Key="SuccessText" Color="#A9D4AF" />
+          <SolidColorBrush x:Key="Danger" Color="#E5705B" />
+          <SolidColorBrush x:Key="DangerSoft" Color="#4A302B" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+      <!-- Claude sets its writing in a serif and its interface in a sans. Source Serif 4 (SIL OFL) and
+           Inter are bundled as open stand-ins, so the look is the same on every PC. -->
+      <FontFamily x:Key="SerifFont">avares://Cuelight/Assets/Fonts#Source Serif 4</FontFamily>
+      <FontFamily x:Key="SerifDisplayFont">avares://Cuelight/Assets/Fonts#Source Serif 4 Display</FontFamily>
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <!-- Base -->
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource Bg}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+
+  <!-- Typography -->
+  <Style Selector="TextBlock.display">
+    <Setter Property="FontFamily" Value="{StaticResource SerifDisplayFont}" />
+    <Setter Property="FontSize" Value="34" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+  <Style Selector="TextBlock.title">
+    <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
+    <Setter Property="FontSize" Value="20" />
+  </Style>
+  <!-- Claude's own words (the suggestions) are set in the serif, as in Claude's chat. -->
+  <Style Selector="TextBlock.reply">
+    <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="LineHeight" Value="24" />
+  </Style>
+  <Style Selector="TextBlock.section">
+    <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
+    <Setter Property="FontSize" Value="15" />
+  </Style>
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+  </Style>
+  <Style Selector="TextBlock.faint">
+    <Setter Property="Foreground" Value="{DynamicResource TextFaint}" />
+  </Style>
+  <Style Selector="TextBlock.small">
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="TextBlock.who">
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+  </Style>
+  <Style Selector="TextBlock.who.me">
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+  <Style Selector="TextBlock.eyebrow">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="0.8" />
+    <Setter Property="Foreground" Value="{DynamicResource TextFaint}" />
+  </Style>
+
+  <!-- Cards -->
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Padding" Value="16,14" />
+  </Style>
+  <Style Selector="Border.option">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="14,12,10,12" />
+  </Style>
+  <Style Selector="Border.chip">
+    <Setter Property="CornerRadius" Value="999" />
+    <Setter Property="Padding" Value="10,3" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Border.chip.say"><Setter Property="Background" Value="{DynamicResource AccentSoft}" /></Style>
+  <Style Selector="Border.chip.type"><Setter Property="Background" Value="{DynamicResource InfoSoft}" /></Style>
+  <Style Selector="Border.chip.answer"><Setter Property="Background" Value="{DynamicResource SuccessSoft}" /></Style>
+  <Style Selector="Border.chip.say > TextBlock"><Setter Property="Foreground" Value="{DynamicResource AccentText}" /></Style>
+  <Style Selector="Border.chip.type > TextBlock"><Setter Property="Foreground" Value="{DynamicResource InfoText}" /></Style>
+  <Style Selector="Border.chip.answer > TextBlock"><Setter Property="Foreground" Value="{DynamicResource SuccessText}" /></Style>
+  <Style Selector="Border.chip > TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <!-- Buttons -->
+  <Style Selector="Button">
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="14,8" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Opacity" Value="0.45" />
+  </Style>
+
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="18,10" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+  </Style>
+  <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentPressed}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+  </Style>
+
+  <Style Selector="Button.primary:disabled">
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+  </Style>
+  <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
+  <Style Selector="Button.secondary">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Button.secondary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+
+  <Style Selector="Button.ghost">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+  <Style Selector="Button.ghost:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+  </Style>
+  <Style Selector="Button.panic:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+  <Style Selector="Button.ghost.done">
+    <Setter Property="Foreground" Value="{DynamicResource Success}" />
+  </Style>
+  <Style Selector="Button.ghost.done:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource Success}" />
+  </Style>
+
+  <!-- Panic: the one button to reach for in a hurry, so it carries the accent. -->
+  <Style Selector="Button.panic">
+    <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Padding" Value="12,6" />
+  </Style>
+  <Style Selector="Button.panic:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoftHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+  <Style Selector="Button.panic:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoftHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentPressed}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+
+  <!-- Pill switches (Recording, Type): quiet when off, tinted when on. -->
+  <Style Selector="ToggleButton.pill">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="ToggleButton.pill:checked">
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+  <Style Selector="ToggleButton.pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+  </Style>
+  <Style Selector="ToggleButton.pill:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="ToggleButton.pill:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoftHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="ToggleButton.rec:checked">
+    <Setter Property="Foreground" Value="{DynamicResource SuccessText}" />
+  </Style>
+  <Style Selector="ToggleButton.rec:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Success}" />
+  </Style>
+  <Style Selector="ToggleButton.rec:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Success}" />
+  </Style>
+  <Style Selector="ToggleButton Ellipse.pilldot">
+    <Setter Property="Fill" Value="{DynamicResource TextFaint}" />
+  </Style>
+  <Style Selector="ToggleButton.rec:checked Ellipse.pilldot">
+    <Setter Property="Fill" Value="{DynamicResource Success}" />
+  </Style>
+  <Style Selector="Border.composer:disabled">
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+
+  <Style Selector="Button.icon">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="9" />
+  </Style>
+  <Style Selector="Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+  <Style Selector="ToggleButton.icon">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="ToggleButton.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+  <Style Selector="ToggleButton.icon:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+
+  <Style Selector="Button.send">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Setter Property="Width" Value="34" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="Button.send:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+  </Style>
+
+  <!-- Text fields -->
+  <Style Selector="TextBox.field">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="MinHeight" Value="40" />
+  </Style>
+  <Style Selector="TextBox.field:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource TextFaint}" />
+  </Style>
+  <Style Selector="TextBox.field:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+  </Style>
+  <Style Selector="TextBox">
+    <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="SelectionForegroundBrush" Value="{DynamicResource Text}" />
+    <Setter Property="CaretBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="TextBox.bare">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="4,8" />
+  </Style>
+  <Style Selector="TextBox.bare /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="TextBox.bare:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="TextBox.bare:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <!-- Segmented control: a ListBox laid out as a pill track -->
+  <Style Selector="ListBox.segmented">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="3" />
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ListBox.segmented > ListBoxItem">
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Padding" Value="4,7" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="ToolTip.Tip" Value="{ReflectionBinding Tip}" />
+  </Style>
+  <Style Selector="ListBox.segmented > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+  </Style>
+  <Style Selector="ListBox.segmented > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="ListBox.segmented > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+  </Style>
+
+  <!-- Choice list (model picker) -->
+  <Style Selector="ListBox.choices">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="ListBox.choices > ListBoxItem">
+    <Setter Property="Padding" Value="14,10" />
+    <Setter Property="Margin" Value="0,0,0,6" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="ToolTip.Tip" Value="{ReflectionBinding Tip}" />
+  </Style>
+  <Style Selector="ListBox.choices > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="ListBox.choices > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+  </Style>
+  <Style Selector="ListBox.choices > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+
+  <!-- Hover explanations: a warm card with wrapped text, in both light and dark. -->
+  <Style Selector="ToolTip">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="12,9" />
+    <Setter Property="MaxWidth" Value="300" />
+    <Setter Property="ContentTemplate">
+      <DataTemplate x:DataType="x:String">
+        <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12.5" LineHeight="18" Foreground="{DynamicResource Text}" />
+      </DataTemplate>
+    </Setter>
+  </Style>
+
+  <!-- Status dot -->
+  <Style Selector="Ellipse.dot">
+    <Setter Property="Width" Value="8" />
+    <Setter Property="Height" Value="8" />
+    <Setter Property="Fill" Value="{DynamicResource TextFaint}" />
+  </Style>
+  <Style Selector="Ellipse.dot.listening"><Setter Property="Fill" Value="{DynamicResource Success}" /></Style>
+  <Style Selector="Ellipse.dot.error"><Setter Property="Fill" Value="{DynamicResource Danger}" /></Style>
+  <Style Selector="Ellipse.dot.busy">
+    <Setter Property="Fill" Value="{DynamicResource Accent}" />
+    <Style.Animations>
+      <Animation Duration="0:0:1.1" IterationCount="Infinite" Easing="SineEaseInOut">
+        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+        <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.25" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
+  <!-- Someone is speaking right now: the dot pulses green and the status reads LISTENING -->
+  <Style Selector="Ellipse.dot.hearing">
+    <Setter Property="Fill" Value="{DynamicResource Success}" />
+    <Style.Animations>
+      <Animation Duration="0:0:0.8" IterationCount="Infinite" Easing="SineEaseInOut">
+        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+        <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+  <Style Selector="TextBlock.muted.hearing">
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LetterSpacing" Value="1.2" />
+    <Setter Property="Foreground" Value="{DynamicResource Success}" />
+  </Style>
+
+  <!-- Three dots that pulse one after another: someone is speaking and the words are still coming -->
+  <Style Selector="Ellipse.typing">
+    <Setter Property="Width" Value="5" />
+    <Setter Property="Height" Value="5" />
+    <Setter Property="VerticalAlignment" Value="Bottom" />
+    <Setter Property="Fill" Value="{DynamicResource TextMuted}" />
+    <Setter Property="Opacity" Value="0.3" />
+  </Style>
+  <Style Selector="Ellipse.typing.d1">
+    <Style.Animations>
+      <Animation Duration="0:0:1.2" IterationCount="Infinite" Easing="SineEaseInOut">
+        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+        <KeyFrame Cue="25%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+        <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+  <Style Selector="Ellipse.typing.d2">
+    <Style.Animations>
+      <Animation Duration="0:0:1.2" Delay="0:0:0.2" IterationCount="Infinite" Easing="SineEaseInOut">
+        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+        <KeyFrame Cue="25%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+        <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+  <Style Selector="Ellipse.typing.d3">
+    <Style.Animations>
+      <Animation Duration="0:0:1.2" Delay="0:0:0.4" IterationCount="Infinite" Easing="SineEaseInOut">
+        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+        <KeyFrame Cue="25%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+        <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.3" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
+  <!-- Thin progress bar -->
+  <Style Selector="ProgressBar.thin">
+    <Setter Property="MinHeight" Value="4" />
+    <Setter Property="Height" Value="4" />
+    <Setter Property="CornerRadius" Value="2" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+  </Style>
+  <Style Selector="ProgressBar.thin /template/ Border#PART_Indicator">
+    <Setter Property="CornerRadius" Value="2" />
+  </Style>
+
+  <Style Selector="ToggleSwitch">
+    <Style.Resources>
+      <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#D97757" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#CC6B4B" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#BE5F40" />
+    </Style.Resources>
+  </Style>
+</Styles>

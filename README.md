@@ -1,4 +1,9 @@
-# Claude Live Conversation Assistant
+# Cuelight
+
+> **Built with Claude Code.** A very large majority of this project (the code, the tests, the
+> build setup and this documentation) was made with [Claude Code](https://claude.com/claude-code),
+> Anthropic's AI coding tool. See the [disclaimer](#disclaimer) at the bottom: this is an independent
+> project with no affiliation with Claude or Anthropic.
 
 A small Windows app that listens to whatever your PC is playing, watches a box you draw
 around any on-screen text, and uses Claude to tell you what to **say** and what to **type**,
@@ -11,7 +16,7 @@ in words that sound like a person.
 
 ## Get started
 
-1. Download `ClaudeLiveAssistant.exe` from the latest [release](../../releases/latest) and
+1. Download `Cuelight.exe` from the latest [release](../../releases/latest) and
    double-click it. It is one file: nothing to unzip or install, not even .NET.
 2. Paste your Claude API key ([get one here](https://console.anthropic.com/settings/keys)).
    That's the only setup.
@@ -22,11 +27,11 @@ choose **More info**, then **Run anyway**.
 
 **Runs on** 64-bit Windows 10 (1607 or later) and Windows 11 on Intel/AMD, with no installs:
 the .exe carries the .NET runtime and the Visual C++ runtime inside it. (On first start it unpacks
-the speech engine to `%LOCALAPPDATA%\Claude Live Assistant\runtime`, and .NET unpacks the graphics
+the speech engine to `%LOCALAPPDATA%\Cuelight\runtime`, and .NET unpacks the graphics
 libraries to a folder under `%TEMP%`; neither needs administrator rights.) PCs without AVX2 (older or
 low-end processors) use a slower build of the speech engine automatically, and PCs with four or
 fewer processor cores start on the fastest speech model. ARM PCs run it through Windows'
-x64 emulation (I haven't tried one). Windows 7, 8 and 32-bit Windows aren't supported.
+x64 emulation (not tried on one yet). Windows 7, 8 and 32-bit Windows aren't supported.
 
 <p align="center"><img src="docs/welcome-light.png" width="300" alt="Welcome screen with the API key field"></p>
 
@@ -116,13 +121,13 @@ Changes are saved as you make them and apply to the next suggestion.
 
 ## Look and feel
 
-The interface follows Claude's own: warm off-white (or charcoal in dark mode), a clay-orange
-accent, Claude's words (the suggestions) set in a serif and the interface in a sans.
-Claude's own typefaces are proprietary, so the app bundles open stand-ins:
+The interface takes its cue from Claude's own design: warm off-white (or charcoal in dark mode), a
+clay-orange accent, the suggestions set in a serif and the interface in a sans. It uses its own
+name and icon, and open-source fonts rather than any of Anthropic's:
 [Source Serif 4](https://github.com/adobe-fonts/source-serif) for the serif and
 [Inter](https://rsms.me/inter/) for the sans (both SIL Open Font License; the license text
-ships in `src/Assistant.App/Assets/Fonts`). To use different fonts, change the two
-`FontFamily` entries at the top of `src/Assistant.App/Styles/Theme.axaml`.
+ships in `src/Cuelight.App/Assets/Fonts`). To use different fonts, change the two
+`FontFamily` entries at the top of `src/Cuelight.App/Styles/Theme.axaml`.
 
 ## What it costs
 
@@ -144,8 +149,8 @@ window (rest the mouse on it for the number of requests and how much came from t
   isn't broken by a start that keeps moving. A very long monologue keeps only its latest part.
 - **Clear chat** when a new call starts, so it isn't paying to re-read the last one.
 
-Rough figures, from Anthropic's list prices and my own estimate of how many tokens a conversation
-takes (I haven't compared them with a real bill yet, so treat them as a guide, and trust the counter
+Rough figures, from Anthropic's list prices and an estimate of how many tokens a conversation
+takes (not yet compared with a real bill, so treat them as a guide, and trust the counter
 in the app and your Console): about **half a cent per suggestion on Sonnet** (a bit more when it
 is also reading a text area), roughly **$1 for an hour of a busy conversation**, with Haiku 5.5 at a
 few cents for the same hour and Opus 5.5 at roughly double Sonnet. Without the cache the same hour
@@ -167,7 +172,7 @@ the slow part on your PC, choose **Fast** under Speech recognition.
 - Speech is turned into text **on your PC**. Claude receives the transcript text and, only
   if you've selected one, a picture of that text area.
 - Auto-suggest sends a request after nearly every sentence you hear, and API use costs money.
-  See **What it costs** below.
+  See **What it costs** above.
 - Transcription and screen reading make mistakes, and Claude is told never to invent facts or
   experiences about you. Check anything factual before you say or send it.
 - Recording or transcribing other people can require their consent where you live, and many
@@ -184,9 +189,9 @@ the slow part on your PC, choose **Fast** under Speech recognition.
 
 ## If something doesn't work
 
-- **Log.** Problems are written to `%LOCALAPPDATA%\Claude Live Assistant\logs\app.log`: errors
+- **Log.** Problems are written to `%LOCALAPPDATA%\Cuelight\logs\app.log`: errors
   and facts about the PC, never what was said, what was on screen, or your key.
-- **Check this PC.** `ClaudeLiveAssistant.exe --self-test --out C:\temp\check` tests the speech
+- **Check this PC.** `Cuelight.exe --self-test --out C:\temp\check` tests the speech
   engine (with real speech if you pass `--wav file.wav --expect word`), the sound devices, screen
   capture, drawing the windows and hiding them from capture, and writes `self-test.txt` and
   screenshots there. Add `--noavx` to test the build for CPUs without AVX2. The Windows build
@@ -197,7 +202,7 @@ the slow part on your PC, choose **Fast** under Speech recognition.
 - **Speech model won't download** (blocked network): the status line says so and offers Retry.
   Downloads resume where they stopped. To do it by hand, put `ggml-base.en.bin` (or `-tiny.en` /
   `-small.en`) from [huggingface.co/ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp)
-  in `%LOCALAPPDATA%\Claude Live Assistant\models`.
+  in `%LOCALAPPDATA%\Cuelight\models`.
 - **Sound.** The app follows your default speakers and headphones when you switch, retries after
   an unplug or sleep, and says in the status line when no device is available or Windows is
   blocking the microphone (Settings → Privacy & security → Microphone).
@@ -212,8 +217,8 @@ Needs the [.NET 8 SDK](https://dotnet.microsoft.com/download).
 
 ```bash
 dotnet test                                   # unit + headless UI tests (any OS)
-dotnet run --project src/Assistant.App        # run it (listening and text-area watching need Windows)
-dotnet publish src/Assistant.App -c Release -r win-x64 -o publish   # -> publish/ClaudeLiveAssistant.exe, one file
+dotnet run --project src/Cuelight.App        # run it (listening and text-area watching need Windows)
+dotnet publish src/Cuelight.App -c Release -r win-x64 -o publish   # -> publish/Cuelight.exe, one file
 ```
 
 The **Build** GitHub Actions workflow runs the tests (on Linux and on Windows), builds the
@@ -221,12 +226,28 @@ single `.exe`, fails if the publish folder holds anything else, copies the `.exe
 folder and runs the self-test above from there on a real Windows machine, checks that nothing it
 unpacked needs a DLL a clean Windows PC lacks (`packaging/check-deps.py`), and uploads the result.
 Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also publishes it as a
-[release](../../releases) whose only file is `ClaudeLiveAssistant.exe` (its SHA-256 is in the notes).
+[release](../../releases) whose only file is `Cuelight.exe` (its SHA-256 is in the notes).
 
 ## How it's put together
 
 | | |
 |---|---|
-| `src/Assistant.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
-| `src/Assistant.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 208 core tests (including the real SDK against a local fake server) and 97 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `src/Cuelight.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, Claude client (official Anthropic .NET SDK). |
+| `src/Cuelight.App` | Avalonia UI (light/dark, Claude-style theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
+| `tests/` | 215 core tests (including the real SDK against a local fake server) and 97 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+
+## Credits
+
+Built on [Avalonia](https://avaloniaui.net/) (the interface), [NAudio](https://github.com/naudio/NAudio)
+(Windows audio), [Whisper.net](https://github.com/sandrohanea/whisper.net) and
+[whisper.cpp](https://github.com/ggerganov/whisper.cpp) with OpenAI's Whisper speech models
+(speech recognition, on your PC), the [Anthropic .NET SDK](https://github.com/anthropics/anthropic-sdk-csharp)
+(the Claude API), and the fonts above. Each is under its own open-source license.
+
+## Disclaimer
+
+Cuelight is an independent, unofficial project. It is **not affiliated with, endorsed by, sponsored by
+or connected to Anthropic, PBC**, the maker of Claude. "Claude" and "Claude Code" are trademarks of
+Anthropic; they appear here only to say what the app works with and how it was made. The app contains
+no Anthropic logos, fonts or other assets. You use it with your own Claude API key, and Anthropic
+bills that use to you under its own terms.

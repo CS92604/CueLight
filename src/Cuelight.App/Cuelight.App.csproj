@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12</LangVersion>
+    <RootNamespace>Cuelight.App</RootNamespace>
+    <AssemblyName>Cuelight</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Do NOT turn built-in COM off: the Windows sound library talks to the audio system through it,
+         and with it off the app cannot hear anything. -->
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.31" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <!-- The speech engine's native libraries. They are not copied beside the app: they are embedded in
+         it (see below) so the published app is one .exe. NoAvx is for CPUs without AVX2; Whisper.net
+         picks it automatically. -->
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" GeneratePathProperty="true" ExcludeAssets="build;buildTransitive;contentFiles" />
+    <PackageReference Include="Whisper.net.Runtime.NoAvx" Version="1.9.1" GeneratePathProperty="true" ExcludeAssets="build;buildTransitive;contentFiles" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cuelight.App.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Cuelight.Core\Cuelight.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Publishing for Windows produces ONE file: the .exe, with the .NET runtime and every library inside.
+       (Avalonia's own native libraries are unpacked by .NET itself on first run; the speech engine's are
+       embedded below and unpacked by SpeechRuntime.) -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- Symbols travel inside the .dll, so error reports have line numbers and no loose .pdb files appear. -->
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <!-- The speech engine (64-bit Windows: the normal build, and the one for CPUs without AVX2). -->
+  <ItemGroup>
+    <EmbeddedResource Include="$(PkgWhisper_net_Runtime)/build/win-x64/*.dll" LogicalName="native/win-x64/%(Filename)%(Extension)" Condition="'$(PkgWhisper_net_Runtime)' != ''" />
+    <EmbeddedResource Include="$(PkgWhisper_net_Runtime_NoAvx)/build/win-x64/*.dll" LogicalName="native/noavx/win-x64/%(Filename)%(Extension)" Condition="'$(PkgWhisper_net_Runtime_NoAvx)' != ''" />
+    <!-- The Visual C++ runtime those libraries need. The release build passes -p:VcRuntimeDir=<folder with
+         vcruntime140.dll, vcruntime140_1.dll, msvcp140.dll, vcomp140.dll>; a plain build leaves it out. -->
+    <EmbeddedResource Include="$(VcRuntimeDir)/*.dll" LogicalName="native/vc/%(Filename)%(Extension)" Condition="'$(VcRuntimeDir)' != '' And Exists('$(VcRuntimeDir)')" />
+  </ItemGroup>
+</Project>
