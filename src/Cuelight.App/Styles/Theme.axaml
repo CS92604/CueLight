@@ -59,10 +59,10 @@
           <SolidColorBrush x:Key="DangerSoft" Color="#46262E" />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
-      <!-- Writing is set in a serif and the interface in a sans. Source Serif 4 (SIL OFL) and Inter are
-           bundled, so the look is the same on every PC. -->
-      <FontFamily x:Key="SerifFont">avares://Cuelight/Assets/Fonts#Source Serif 4</FontFamily>
-      <FontFamily x:Key="SerifDisplayFont">avares://Cuelight/Assets/Fonts#Source Serif 4 Display</FontFamily>
+      <!-- Writing and headings are set in Young Serif and the interface in Inter. Both are open fonts (SIL OFL)
+           and both are bundled, so the look is the same on every PC. -->
+      <FontFamily x:Key="SerifFont">avares://Cuelight/Assets/Fonts#Young Serif</FontFamily>
+      <FontFamily x:Key="SerifDisplayFont">avares://Cuelight/Assets/Fonts#Young Serif</FontFamily>
     </ResourceDictionary>
   </Styles.Resources>
 

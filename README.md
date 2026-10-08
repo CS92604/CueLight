@@ -167,9 +167,9 @@ The interface has its own look: a white with a faint violet tint in light mode, 
 dark mode, blue buttons and selections, and violet and pink touches on the **SAY**, **TYPE** and
 **ANSWER** labels. The suggestions are set in a serif and the interface in a sans. It uses its own
 name and icon, and open-source fonts rather than any of Anthropic's:
-[Source Serif 4](https://github.com/adobe-fonts/source-serif) for the serif and
-[Inter](https://rsms.me/inter/) for the sans (both SIL Open Font License; the license text
-ships in `src/Cuelight.App/Assets/Fonts`). To change the fonts or the colours, edit
+[Young Serif](https://github.com/noirblancrouge/YoungSerif) for the headings and suggestions and
+[Inter](https://rsms.me/inter/) for the interface (both SIL Open Font License; Young Serif's
+license text ships in `src/Cuelight.App/Assets/Fonts`). To change the fonts or the colours, edit
 `src/Cuelight.App/Styles/Theme.axaml`: the two `FontFamily` entries, or the named colour brushes
 (one set for light mode, one for dark).
 
@@ -292,7 +292,7 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Cuelight.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, the Claude client (official Anthropic .NET SDK) and a client for the OpenAI-style chat API used by ChatGPT, Gemini, Grok and others. |
 | `src/Cuelight.App` | Avalonia UI (light/dark, violet-and-blue theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 275 core tests (including the real SDK against a local fake server) and 118 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `tests/` | 276 core tests (including the real SDK against a local fake server) and 121 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
 
 ## License
 

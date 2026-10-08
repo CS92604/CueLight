@@ -146,4 +146,19 @@ public class ThemeTests
                 Assert.False(text.Contains(old, StringComparison.OrdinalIgnoreCase), $"{Path.GetFileName(file)} still uses the old colour {old}");
         }
     }
+
+    [Fact]
+    public void The_bundled_fonts_are_open_ones_with_their_licence_and_no_Anthropic_typeface_remains()
+    {
+        var fonts = RepoFile("src", "Cuelight.App", "Assets", "Fonts");
+        Assert.True(File.Exists(Path.Combine(fonts, "YoungSerif-Regular.ttf")));
+        Assert.Contains("SIL OPEN FONT LICENSE", File.ReadAllText(Path.Combine(fonts, "LICENSE-YoungSerif.txt")));
+        Assert.Contains("Assets/Fonts#Young Serif", File.ReadAllText(RepoFile("src", "Cuelight.App", "Styles", "Theme.axaml")));
+        // Every font file in the folder has its licence next to it.
+        foreach (var ttf in Directory.EnumerateFiles(fonts, "*.ttf"))
+        {
+            var name = Path.GetFileNameWithoutExtension(ttf).Split('-')[0];
+            Assert.True(Directory.EnumerateFiles(fonts, $"LICENSE-{name}.*").Any(), $"{name} has no licence file beside it");
+        }
+    }
 }
