@@ -111,6 +111,7 @@ public class OpenAiCompatibleSuggesterTests
         var (path, body, headers) = server.Requests.Single();
         Assert.Equal("/v1/chat/completions", path);
         Assert.Equal("Bearer sk-test-key", headers["authorization"]);
+        Assert.StartsWith("Cuelight/", headers["user-agent"]);
         Assert.Equal("gpt-6.1-sol", body.GetProperty("model").GetString());
         Assert.True(body.GetProperty("stream").GetBoolean());
         Assert.True(body.GetProperty("stream_options").GetProperty("include_usage").GetBoolean());
@@ -300,6 +301,7 @@ public class OpenAiCompatibleSuggesterTests
         using var server = new FakeChatServer();
         var noKey = await Assert.ThrowsAsync<InvalidOperationException>(() => Collect(Suggester(server, key: null), Req()));
         Assert.Contains("ChatGPT API key", noKey.Message);
+        Assert.Contains("Settings", noKey.Message);
 
         var noModel = await Assert.ThrowsAsync<ProviderApiException>(() => Collect(Suggester(server), Req(Provider.Other, model: "  ", address: server.Url)));
         Assert.Contains("model name", noModel.Message);

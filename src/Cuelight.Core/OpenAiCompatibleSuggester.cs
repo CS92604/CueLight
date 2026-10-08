@@ -37,6 +37,7 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(120);
     private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(20);
     private const int MaxAttempts = 4;
+    private const string UserAgent = "Cuelight/1.0";   // some gateways turn away a request that doesn't say who sent it
 
     private readonly Func<Provider, string?> _apiKey;
     private readonly HttpClient _http;
@@ -55,6 +56,7 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
         _maxTokens = maxTokens;
         _http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
         _http.Timeout = RequestTimeout;   // until the answer starts; a stream that has begun is not cut off by it
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
     }
 
     /// <summary>What a provider turned out not to accept. Remembered per provider and model.</summary>
@@ -95,7 +97,7 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
         var model = settings.Model.Trim();
         if (model.Length == 0) throw new ProviderApiException("Enter a model name in Settings.");
         var key = _apiKey(settings.Provider);
-        if (string.IsNullOrWhiteSpace(key)) throw new InvalidOperationException($"No {info.Name} API key is set.");
+        if (string.IsNullOrWhiteSpace(key)) throw new InvalidOperationException($"No {info.Name} API key is set. Add one in Settings.");
 
         var quirks = _quirks.GetOrAdd($"{settings.Provider}|{model}", _ => Quirks.For(settings.Provider));
         string front = string.Concat(Prompting.FrontBlocks(request).Select(b => b.Text));
@@ -378,6 +380,7 @@ public sealed class OpenAiCompatibleSuggester : ISuggester
         {
             using var http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
             http.Timeout = CheckTimeout;
+            http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
             limit.CancelAfter(CheckTimeout + TimeSpan.FromSeconds(5));
             using var message = new HttpRequestMessage(HttpMethod.Get, root + "/models");
