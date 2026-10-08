@@ -5,7 +5,7 @@ using System.Runtime.Versioning;
 namespace Cuelight.App.Platform;
 
 /// <summary>
-/// Solid orange rectangles floating above everything, made directly with Windows. They draw the outline
+/// Solid blue rectangles floating above everything, made directly with Windows. They draw the outline
 /// around the watched text area.
 ///
 /// Why not ordinary Avalonia windows: Windows keeps a normal top-level window above a minimum size (about
@@ -19,7 +19,8 @@ namespace Cuelight.App.Platform;
 internal sealed class NativeBars : IDisposable
 {
     private const string ClassName = "Cuelight.Outline";
-    private const uint Orange = 0x5777D9; // #D97757 as a Windows colour (blue, green, red)
+    // The outline colour as a Windows colour, which is stored blue, green, red.
+    private const uint Blue = (uint)(Views.RegionOutline.ColorB << 16 | Views.RegionOutline.ColorG << 8 | Views.RegionOutline.ColorR);
 
     private static readonly object Gate = new();
     private static bool _registered;
@@ -80,7 +81,7 @@ internal sealed class NativeBars : IDisposable
                 cbSize = (uint)Marshal.SizeOf<WndClassEx>(),
                 lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_proc),
                 hInstance = GetModuleHandleW(null),
-                hbrBackground = CreateSolidBrush(Orange),
+                hbrBackground = CreateSolidBrush(Blue),
                 lpszClassName = ClassName,
             };
             if (RegisterClassExW(ref cls) == 0) throw new Win32Exception(Marshal.GetLastWin32Error());

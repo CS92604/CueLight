@@ -285,15 +285,15 @@ internal static class SelfTest
                     outline.Show(area);
                     await Task.Delay(500);
                     var (bgra, w, h) = new GdiScreenCapture().GrabBgra(new Region(area.Left - margin, area.Top - margin, area.Width + 2 * margin, area.Height + 2 * margin));
-                    bool Orange(int x, int y)
+                    bool Outline(int x, int y)
                     {
                         int i = (y * w + x) * 4;
-                        return Math.Abs(bgra[i] - 0x57) <= 6 && Math.Abs(bgra[i + 1] - 0x77) <= 6 && Math.Abs(bgra[i + 2] - 0xD9) <= 6;
+                        return Math.Abs(bgra[i] - RegionOutline.ColorB) <= 6 && Math.Abs(bgra[i + 1] - RegionOutline.ColorG) <= 6 && Math.Abs(bgra[i + 2] - RegionOutline.ColorR) <= 6;
                     }
                     int midX = margin + area.Width / 2, midY = margin + area.Height / 2;
                     int right = margin + area.Width, bottom = margin + area.Height;
                     var problems = new List<string>();
-                    void Expect(bool want, string what, int x, int y) { if (Orange(x, y) != want) problems.Add($"{what} at ({x},{y}) should {(want ? "" : "not ")}be orange"); }
+                    void Expect(bool want, string what, int x, int y) { if (Outline(x, y) != want) problems.Add($"{what} at ({x},{y}) should {(want ? "" : "not ")}be the outline colour"); }
                     for (int d = 1; d <= RegionOutline.Thickness; d++)
                     {
                         Expect(true, "left bar", margin - d, midY);

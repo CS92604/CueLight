@@ -1,57 +1,62 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-  <!-- Warm neutrals, a clay accent and serif headings, in light and dark. -->
+  <!-- Cool lavender-tinted neutrals (a violet-white in light mode, a very dark purple in dark mode), a blue
+       accent with violet and pink for the suggestion chips, and serif headings. -->
   <Styles.Resources>
     <ResourceDictionary>
       <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
-          <SolidColorBrush x:Key="Bg" Color="#FAF9F5" />
+          <SolidColorBrush x:Key="Bg" Color="#F7F6FC" />
           <SolidColorBrush x:Key="Surface" Color="#FFFFFF" />
-          <SolidColorBrush x:Key="SurfaceAlt" Color="#F2F0E8" />
-          <SolidColorBrush x:Key="Border" Color="#E7E4D9" />
-          <SolidColorBrush x:Key="BorderStrong" Color="#D5D1C3" />
-          <SolidColorBrush x:Key="Text" Color="#1F1E1C" />
-          <SolidColorBrush x:Key="TextMuted" Color="#6F6D66" />
-          <SolidColorBrush x:Key="TextFaint" Color="#9A978D" />
-          <SolidColorBrush x:Key="Accent" Color="#D97757" />
-          <SolidColorBrush x:Key="AccentHover" Color="#CC6B4B" />
-          <SolidColorBrush x:Key="AccentPressed" Color="#BE5F40" />
+          <SolidColorBrush x:Key="SurfaceAlt" Color="#EEECF8" />
+          <SolidColorBrush x:Key="Border" Color="#E2DFF0" />
+          <SolidColorBrush x:Key="BorderStrong" Color="#CBC7E0" />
+          <SolidColorBrush x:Key="Text" Color="#1C1A33" />
+          <SolidColorBrush x:Key="TextMuted" Color="#67647F" />
+          <SolidColorBrush x:Key="TextFaint" Color="#9390AC" />
+          <SolidColorBrush x:Key="Accent" Color="#4A66E8" />
+          <SolidColorBrush x:Key="AccentHover" Color="#3C56D4" />
+          <SolidColorBrush x:Key="AccentPressed" Color="#3047BA" />
           <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
-          <SolidColorBrush x:Key="AccentSoft" Color="#F8E9E2" />
-          <SolidColorBrush x:Key="AccentSoftHover" Color="#F3DACE" />
-          <SolidColorBrush x:Key="AccentText" Color="#B0502F" />
-          <SolidColorBrush x:Key="InfoSoft" Color="#E8EEF4" />
-          <SolidColorBrush x:Key="InfoText" Color="#3E5A78" />
-          <SolidColorBrush x:Key="Success" Color="#5B8F62" />
-          <SolidColorBrush x:Key="SuccessSoft" Color="#E5EFE3" />
-          <SolidColorBrush x:Key="SuccessText" Color="#3B6B44" />
-          <SolidColorBrush x:Key="Danger" Color="#C4452F" />
-          <SolidColorBrush x:Key="DangerSoft" Color="#FBE9E5" />
+          <SolidColorBrush x:Key="AccentSoft" Color="#E6EBFE" />
+          <SolidColorBrush x:Key="AccentSoftHover" Color="#D4DDFC" />
+          <SolidColorBrush x:Key="AccentText" Color="#3045B8" />
+          <SolidColorBrush x:Key="VioletSoft" Color="#EDE7FD" />
+          <SolidColorBrush x:Key="VioletText" Color="#5A37B5" />
+          <SolidColorBrush x:Key="PinkSoft" Color="#FCE6F1" />
+          <SolidColorBrush x:Key="PinkText" Color="#A3256A" />
+          <SolidColorBrush x:Key="Success" Color="#2F9A6B" />
+          <SolidColorBrush x:Key="SuccessSoft" Color="#DFF3EA" />
+          <SolidColorBrush x:Key="SuccessText" Color="#1F6B49" />
+          <SolidColorBrush x:Key="Danger" Color="#C9403A" />
+          <SolidColorBrush x:Key="DangerSoft" Color="#FCE8E7" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="Bg" Color="#262624" />
-          <SolidColorBrush x:Key="Surface" Color="#30302E" />
-          <SolidColorBrush x:Key="SurfaceAlt" Color="#3A3936" />
-          <SolidColorBrush x:Key="Border" Color="#43423E" />
-          <SolidColorBrush x:Key="BorderStrong" Color="#55544F" />
-          <SolidColorBrush x:Key="Text" Color="#F4F3EE" />
-          <SolidColorBrush x:Key="TextMuted" Color="#AEACA3" />
-          <SolidColorBrush x:Key="TextFaint" Color="#85837B" />
-          <SolidColorBrush x:Key="Accent" Color="#D97757" />
-          <SolidColorBrush x:Key="AccentHover" Color="#E58968" />
-          <SolidColorBrush x:Key="AccentPressed" Color="#C96A4B" />
+          <SolidColorBrush x:Key="Bg" Color="#130F20" />
+          <SolidColorBrush x:Key="Surface" Color="#1B1630" />
+          <SolidColorBrush x:Key="SurfaceAlt" Color="#272046" />
+          <SolidColorBrush x:Key="Border" Color="#2E2750" />
+          <SolidColorBrush x:Key="BorderStrong" Color="#413A66" />
+          <SolidColorBrush x:Key="Text" Color="#F2EFFC" />
+          <SolidColorBrush x:Key="TextMuted" Color="#ABA6C9" />
+          <SolidColorBrush x:Key="TextFaint" Color="#7D789B" />
+          <SolidColorBrush x:Key="Accent" Color="#4C68EE" />
+          <SolidColorBrush x:Key="AccentHover" Color="#6179F4" />
+          <SolidColorBrush x:Key="AccentPressed" Color="#3C57D9" />
           <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
-          <SolidColorBrush x:Key="AccentSoft" Color="#4A3A33" />
-          <SolidColorBrush x:Key="AccentSoftHover" Color="#5A453C" />
-          <SolidColorBrush x:Key="AccentText" Color="#EFA88C" />
-          <SolidColorBrush x:Key="InfoSoft" Color="#34404D" />
-          <SolidColorBrush x:Key="InfoText" Color="#A8C1DA" />
-          <SolidColorBrush x:Key="Success" Color="#7DB284" />
-          <SolidColorBrush x:Key="SuccessSoft" Color="#2F3D32" />
-          <SolidColorBrush x:Key="SuccessText" Color="#A9D4AF" />
-          <SolidColorBrush x:Key="Danger" Color="#E5705B" />
-          <SolidColorBrush x:Key="DangerSoft" Color="#4A302B" />
+          <SolidColorBrush x:Key="AccentSoft" Color="#222C62" />
+          <SolidColorBrush x:Key="AccentSoftHover" Color="#2C3A7C" />
+          <SolidColorBrush x:Key="AccentText" Color="#A9B9FF" />
+          <SolidColorBrush x:Key="VioletSoft" Color="#33235F" />
+          <SolidColorBrush x:Key="VioletText" Color="#C8B4FF" />
+          <SolidColorBrush x:Key="PinkSoft" Color="#4A2044" />
+          <SolidColorBrush x:Key="PinkText" Color="#FFAED6" />
+          <SolidColorBrush x:Key="Success" Color="#4FC592" />
+          <SolidColorBrush x:Key="SuccessSoft" Color="#1B3A31" />
+          <SolidColorBrush x:Key="SuccessText" Color="#9BE5C4" />
+          <SolidColorBrush x:Key="Danger" Color="#F0766E" />
+          <SolidColorBrush x:Key="DangerSoft" Color="#46262E" />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
       <!-- Writing is set in a serif and the interface in a sans. Source Serif 4 (SIL OFL) and Inter are
@@ -134,11 +139,11 @@
     <Setter Property="HorizontalAlignment" Value="Left" />
   </Style>
   <Style Selector="Border.chip.say"><Setter Property="Background" Value="{DynamicResource AccentSoft}" /></Style>
-  <Style Selector="Border.chip.type"><Setter Property="Background" Value="{DynamicResource InfoSoft}" /></Style>
-  <Style Selector="Border.chip.answer"><Setter Property="Background" Value="{DynamicResource SuccessSoft}" /></Style>
+  <Style Selector="Border.chip.type"><Setter Property="Background" Value="{DynamicResource VioletSoft}" /></Style>
+  <Style Selector="Border.chip.answer"><Setter Property="Background" Value="{DynamicResource PinkSoft}" /></Style>
   <Style Selector="Border.chip.say > TextBlock"><Setter Property="Foreground" Value="{DynamicResource AccentText}" /></Style>
-  <Style Selector="Border.chip.type > TextBlock"><Setter Property="Foreground" Value="{DynamicResource InfoText}" /></Style>
-  <Style Selector="Border.chip.answer > TextBlock"><Setter Property="Foreground" Value="{DynamicResource SuccessText}" /></Style>
+  <Style Selector="Border.chip.type > TextBlock"><Setter Property="Foreground" Value="{DynamicResource VioletText}" /></Style>
+  <Style Selector="Border.chip.answer > TextBlock"><Setter Property="Foreground" Value="{DynamicResource PinkText}" /></Style>
   <Style Selector="Border.chip > TextBlock">
     <Setter Property="FontSize" Value="11" />
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -356,7 +361,7 @@
     <Setter Property="BorderThickness" Value="1.5" />
   </Style>
   <Style Selector="TextBox">
-    <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoftHover}" />
     <Setter Property="SelectionForegroundBrush" Value="{DynamicResource Text}" />
     <Setter Property="CaretBrush" Value="{DynamicResource Accent}" />
   </Style>
@@ -438,7 +443,7 @@
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
   </Style>
 
-  <!-- Hover explanations: a warm card with wrapped text, in both light and dark. -->
+  <!-- Hover explanations: a card with wrapped text, in both light and dark. -->
   <Style Selector="ToolTip">
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
@@ -542,9 +547,9 @@
 
   <Style Selector="ToggleSwitch">
     <Style.Resources>
-      <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#D97757" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#CC6B4B" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#BE5F40" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#4A66E8" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#3C56D4" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#3047BA" />
     </Style.Resources>
   </Style>
 </Styles>

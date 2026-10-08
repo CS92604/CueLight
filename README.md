@@ -48,7 +48,7 @@ Two switches sit at the top of the window.
 - **Type ON / OFF.** Off (the default), the app only listens to the conversation and gives you
   things to **say**. Turn it on and a **Text area to watch** card appears with a **Select area**
   button: the screen freezes like the Snipping Tool and you drag a box over the chat, email or
-  document. A thin orange outline stays around it (just outside, so it's never in what the AI
+  document. A thin blue outline stays around it (just outside, so it's never in what the AI
   sees). When the text changes and stops changing, the AI reads it and suggests what to **type**.
   Keep the Cuelight window off the box. Switching Type off stops watching but remembers the box.
 
@@ -163,13 +163,15 @@ services, so if one misbehaves, what the provider replied is shown in the app an
 
 ## Look and feel
 
-The interface takes its cue from Claude's own design: warm off-white (or charcoal in dark mode), a
-clay-orange accent, the suggestions set in a serif and the interface in a sans. It uses its own
+The interface has its own look: a white with a faint violet tint in light mode, a very dark purple in
+dark mode, blue buttons and selections, and violet and pink touches on the **SAY**, **TYPE** and
+**ANSWER** labels. The suggestions are set in a serif and the interface in a sans. It uses its own
 name and icon, and open-source fonts rather than any of Anthropic's:
 [Source Serif 4](https://github.com/adobe-fonts/source-serif) for the serif and
 [Inter](https://rsms.me/inter/) for the sans (both SIL Open Font License; the license text
-ships in `src/Cuelight.App/Assets/Fonts`). To use different fonts, change the two
-`FontFamily` entries at the top of `src/Cuelight.App/Styles/Theme.axaml`.
+ships in `src/Cuelight.App/Assets/Fonts`). To change the fonts or the colours, edit
+`src/Cuelight.App/Styles/Theme.axaml`: the two `FontFamily` entries, or the named colour brushes
+(one set for light mode, one for dark).
 
 ## What it costs
 
@@ -233,7 +235,7 @@ slow part on your PC, choose **Fast** under Speech recognition.
   situation.
 - **Hide from screen sharing** (Settings → Privacy, off by default) uses the Windows setting that
   apps like password managers use, so Teams, Zoom, Meet, OBS, the Snipping Tool and similar
-  capture software don't see the app's windows, including the picker and the orange outline.
+  capture software don't see the app's windows, including the picker and the blue outline.
   It doesn't hide anything from a camera pointed at your screen, a capture card, or anyone
   looking at your monitor, and the app's taskbar button can still show up if your whole screen
   is shared. It's for keeping your notes and other people's messages private, not for getting
@@ -289,8 +291,8 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 | | |
 |---|---|
 | `src/Cuelight.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, the Claude client (official Anthropic .NET SDK) and a client for the OpenAI-style chat API used by ChatGPT, Gemini, Grok and others. |
-| `src/Cuelight.App` | Avalonia UI (light/dark, warm theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 266 core tests (including the real SDK against a local fake server) and 118 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `src/Cuelight.App` | Avalonia UI (light/dark, violet-and-blue theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
+| `tests/` | 275 core tests (including the real SDK against a local fake server) and 118 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
 
 ## License
 

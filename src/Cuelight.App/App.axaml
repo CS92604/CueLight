@@ -12,8 +12,8 @@
   <Application.Styles>
     <FluentTheme>
       <FluentTheme.Palettes>
-        <ColorPaletteResources x:Key="Light" Accent="#D97757" RegionColor="#FAF9F5" ErrorText="#C4452F" />
-        <ColorPaletteResources x:Key="Dark" Accent="#D97757" RegionColor="#262624" ErrorText="#E5705B" />
+        <ColorPaletteResources x:Key="Light" Accent="#4A66E8" RegionColor="#F7F6FC" ErrorText="#C9403A" />
+        <ColorPaletteResources x:Key="Dark" Accent="#4C68EE" RegionColor="#130F20" ErrorText="#F0766E" />
       </FluentTheme.Palettes>
     </FluentTheme>
     <StyleInclude Source="avares://Cuelight/Styles/Theme.axaml" />

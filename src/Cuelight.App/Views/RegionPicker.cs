@@ -60,14 +60,14 @@ public static class RegionPicker
 
     private sealed class PickerWindow : Window
     {
-        private static readonly IBrush Dim = new SolidColorBrush(Color.FromArgb(0x99, 0x14, 0x14, 0x13));
+        private static readonly IBrush Dim = new SolidColorBrush(Color.FromArgb(0x99, 0x13, 0x0F, 0x20));
         private readonly Screen _screen;
         private readonly Action<Region?> _done;
         private readonly Canvas _canvas = new();
         private readonly Rectangle[] _dim = { new(), new(), new(), new() };
         private readonly Border _box = new()
         {
-            BorderBrush = new SolidColorBrush(Color.Parse("#D97757")),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(RegionOutline.ColorR, RegionOutline.ColorG, RegionOutline.ColorB)),
             BorderThickness = new Thickness(2),
             IsHitTestVisible = false,
         };
@@ -98,7 +98,7 @@ public static class RegionPicker
 
             _sizeTag = new Border
             {
-                Background = new SolidColorBrush(Color.Parse("#E6141413")),
+                Background = new SolidColorBrush(Color.Parse("#E6130F20")),
                 CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(8, 3),
                 Child = _sizeText,
@@ -109,7 +109,7 @@ public static class RegionPicker
 
             var hint = new Border
             {
-                Background = new SolidColorBrush(Color.Parse("#EB141413")),
+                Background = new SolidColorBrush(Color.Parse("#EB130F20")),
                 CornerRadius = new CornerRadius(999),
                 Padding = new Thickness(18, 10),
                 IsHitTestVisible = false,
@@ -194,6 +194,9 @@ public static class RegionPicker
 public sealed class RegionOutline : IDisposable
 {
     public const int Thickness = 3; // physical pixels
+
+    /// <summary>The outline's colour (a blue that shows on both light and dark pages): used by the bars, the area picker and the self-test.</summary>
+    internal const byte ColorR = 0x4F, ColorG = 0x6B, ColorB = 0xF0;
 
     private IDisposable? _bars;
     private IReadOnlyList<IntPtr> _handles = Array.Empty<IntPtr>();
