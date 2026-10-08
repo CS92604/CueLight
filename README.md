@@ -290,7 +290,13 @@ Pushing a tag like `v0.2.0` (or running the workflow by hand with a tag) also pu
 |---|---|
 | `src/Cuelight.Core` | Everything that isn't UI or OS: conversation, prompting, SAY/TYPE parsing, the suggestion engine, change detection, speech segmentation, settings, key storage, the Claude client (official Anthropic .NET SDK) and a client for the OpenAI-style chat API used by ChatGPT, Gemini, Grok and others. |
 | `src/Cuelight.App` | Avalonia UI (light/dark, warm theme), Windows audio (WASAPI loopback + mic via NAudio), GDI screen capture, Whisper speech recognition (Whisper.net / whisper.cpp). |
-| `tests/` | 265 core tests (including the real SDK against a local fake server) and 118 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+| `tests/` | 266 core tests (including the real SDK against a local fake server) and 118 app tests: headless UI tests that render the windows, drive the area picker with simulated input, check every control has hover text, and measure the layout (equal gaps left and right, nothing running off the edge at the smallest window size, at 100–250% display scaling), plus the model downloader, speech-engine unpacking, single-instance and start-up logic. |
+
+## License
+
+[MIT](LICENSE): you may use, copy, modify and share it freely, as long as the license notice stays with it.
+The fonts bundled with the app and the libraries it uses keep their own licenses (the fonts' license text
+is in `src/Cuelight.App/Assets/Fonts`).
 
 ## Credits
 
