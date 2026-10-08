@@ -1,7 +1,6 @@
 using System.Collections.Specialized;
 using Cuelight.App.ViewModels;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Threading;
 
 namespace Cuelight.App.Views;

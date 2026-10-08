@@ -30,7 +30,6 @@
           <SolidColorBrush x:Key="SuccessSoft" Color="#DFF3EA" />
           <SolidColorBrush x:Key="SuccessText" Color="#1F6B49" />
           <SolidColorBrush x:Key="Danger" Color="#C9403A" />
-          <SolidColorBrush x:Key="DangerSoft" Color="#FCE8E7" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
           <SolidColorBrush x:Key="Bg" Color="#130F20" />
@@ -56,7 +55,6 @@
           <SolidColorBrush x:Key="SuccessSoft" Color="#1B3A31" />
           <SolidColorBrush x:Key="SuccessText" Color="#9BE5C4" />
           <SolidColorBrush x:Key="Danger" Color="#F0766E" />
-          <SolidColorBrush x:Key="DangerSoft" Color="#46262E" />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
       <!-- Writing and headings are set in Young Serif and the interface in Inter. Both are open fonts (SIL OFL)
@@ -91,10 +89,6 @@
     <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
     <Setter Property="FontSize" Value="16" />
     <Setter Property="LineHeight" Value="24" />
-  </Style>
-  <Style Selector="TextBlock.section">
-    <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
-    <Setter Property="FontSize" Value="15" />
   </Style>
   <Style Selector="TextBlock.muted">
     <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />

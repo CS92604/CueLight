@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
-using Xunit;
 
 namespace Cuelight.App.Tests;
 

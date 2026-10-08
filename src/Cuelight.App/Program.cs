@@ -22,7 +22,11 @@ internal static class Program
     {
         AppPaths.MigrateLegacyFolders();   // first, before anything (the log, say) creates the new folders
         InstallSafetyNets();
-        if (args.Contains("--self-test")) return SelfTest.Run(args); // checks this PC; see SelfTest
+        if (args.Contains("--self-test")) // checks this PC; see SelfTest
+        {
+            if (!OperatingSystem.IsWindows()) { Console.Error.WriteLine("The self-test checks Windows features, so it only runs on Windows."); return 1; }
+            return SelfTest.Run(args);
+        }
 
         using var single = SingleInstance.TryAcquire();
         if (single is null) return 0; // already running: that copy was asked to come forward

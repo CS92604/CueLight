@@ -17,7 +17,7 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        if (SelfTest.Active && ApplicationLifetime is IClassicDesktopStyleApplicationLifetime test)
+        if (OperatingSystem.IsWindows() && SelfTest.Active && ApplicationLifetime is IClassicDesktopStyleApplicationLifetime test)
         {
             test.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             _ = SelfTest.RunWindows(test);

@@ -36,7 +36,7 @@ public static class SpeechModel
     /// <summary>A plain-language reason (and what to do) for a failure while preparing the speech model.</summary>
     public static string Explain(Exception ex, SpeechAccuracy accuracy)
     {
-        var (file, approx) = Describe(accuracy);
+        var (_, approx) = Describe(accuracy);
         return ex switch
         {
             OperationCanceledException => "Setting up speech recognition was interrupted.",

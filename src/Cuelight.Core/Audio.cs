@@ -158,7 +158,6 @@ public sealed class AudioPipeline : IDisposable
     private readonly List<IAudioSource> _sources = new();
     private readonly Func<DateTime> _now;
     private DateTime _lastBehindNotice = DateTime.MinValue;
-    private Task? _loop;
 
     // Live preview state (guarded by _live): the newest speech audio per speaker not yet previewed, who is
     // speaking, the preview pass in progress, and the earliest time the next pass may start.
@@ -249,7 +248,7 @@ public sealed class AudioPipeline : IDisposable
     public void Start()
     {
         _started = true;
-        _loop = Task.Run(LoopAsync);
+        _ = Task.Run(LoopAsync);
         IAudioSource[] sources;
         lock (_sources) sources = _sources.ToArray();
         foreach (var s in sources) s.Start();

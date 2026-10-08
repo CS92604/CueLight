@@ -10,7 +10,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
-using Avalonia.Threading;
 using NAudio.Wave;
 
 namespace Cuelight.App;
@@ -26,6 +25,7 @@ namespace Cuelight.App;
 /// someone's PC. It never contacts Claude and sends nothing anywhere (except the one-time speech
 /// model download, as in normal use).
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 internal static class SelfTest
 {
     public static bool Active { get; private set; }

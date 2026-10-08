@@ -1,4 +1,3 @@
-using System.Globalization;
 using Avalonia.Data.Converters;
 
 namespace Cuelight.App.ViewModels;
