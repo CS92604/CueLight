@@ -31,12 +31,14 @@ public sealed class AppHost : IDisposable
     {
         Settings = _store.Exists ? _store.Load() : Settings.ForFirstRun(Environment.ProcessorCount);
         Capture = PlatformServices.CreateScreenCapture();
+        TextReader = PlatformServices.CreateTextReader();
         // Claude is called through Anthropic's SDK; every other provider through the OpenAI-style chat API.
         _suggester = new RoutingSuggester(new ClaudeSuggester(() => _keys.Get(Provider.Claude)), new OpenAiCompatibleSuggester(_keys.Get));
-        Engine = new Engine(new EngineOptions { AutoSuggest = Settings.AutoSuggest }, _suggester, Capture)
+        Engine = new Engine(new EngineOptions { AutoSuggest = Settings.AutoSuggest }, _suggester, Capture, textReader: TextReader)
         {
             Settings = Settings,
         };
+        if (Settings.ScreenReading == ScreenReading.Fast) WarmUpTextReader();
         Engine.SetTextEnabled(Settings.TypeEnabled);
 
         // Windows are flagged as they open, so this has to be decided before the first one is shown.
@@ -48,6 +50,13 @@ public sealed class AppHost : IDisposable
     public Settings Settings { get; }
     public Engine Engine { get; }
     public IScreenCapture Capture { get; }
+    /// <summary>Reads the words in the watched area on this PC (Fast screen reading); null if this system can't.</summary>
+    public ITextReader? TextReader { get; }
+
+    private void WarmUpTextReader()
+    {
+        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 14393) && TextReader is WindowsTextReader reader) reader.WarmUp();
+    }
     /// <summary>The provider in use has a saved key.</summary>
     public bool HasKey => _keys.Has(Settings.Provider);
 
@@ -233,6 +242,7 @@ public sealed class AppHost : IDisposable
     {
         Engine.Settings = Settings.Normalized();
         Engine.Options.AutoSuggest = Settings.AutoSuggest;
+        if (Settings.ScreenReading == ScreenReading.Fast) WarmUpTextReader();
         if (Settings.UseMicrophone) AttachMic(); else DetachMic();
         if (Settings.HideFromCapture != _hiddenFromCapture)
         {
@@ -256,7 +266,7 @@ public sealed class AppHost : IDisposable
         if (_settingsWindow is { } open) { open.Activate(); return; } // already open: don't stack a second one
         var entry = new KeyEntryViewModel();
         var vm = new SettingsViewModel(Settings, ApplySettings, entry, _keys.Get(Settings.Provider),
-            key => SetKey(Settings.Provider, key), _keys.Get);
+            key => SetKey(Settings.Provider, key), _keys.Get, () => TextReader?.IsAvailable ?? false);
         var win = new SettingsWindow { DataContext = vm };
         KeyRemoved += CloseOnRemoved;
         _settingsWindow = win;

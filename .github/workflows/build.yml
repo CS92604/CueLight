@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main, 'claude/**']
+    branches: ['**']
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -12,6 +12,14 @@ on:
         required: false
   release:
     types: [published]
+
+# Nothing here needs to write to the repository except attaching a release, which the windows job asks for itself.
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  AVALONIA_TELEMETRY_OPTOUT: '1'
 
 jobs:
   test:
@@ -185,14 +193,16 @@ jobs:
         run: |
           @"
           **Download ``Cuelight.exe`` and double-click it.** That is the whole app: one file, nothing to install or unzip.
-          Paste your Claude API key on first launch; that is the only setup.
+          Choose your AI on first launch and paste its API key; that is the only setup. It works with Claude, ChatGPT, Gemini, Grok, NVIDIA's free API catalog, or any service that speaks the OpenAI chat API.
 
-          Claude's API is billed by Anthropic separately from a Claude subscription. The app uses Sonnet 5.5 by default, remembers what it has already read so repeat requests are cheap, and shows a running cost estimate in its top-right corner. See "What it costs" in the README.
+          AI providers bill API use separately from a chat subscription (NVIDIA's API is free to try, within limits). The app starts each provider on its balanced model and shows a running cost estimate, or "Free", in its top-right corner. See "AI providers" and "What it costs" in the README.
 
           Windows 10 or 11, 64-bit. Windows may say "Windows protected your PC" because the app isn't code-signed yet:
           choose **More info**, then **Run anyway**. The first start unpacks the speech engine and downloads a one-time speech model (about 140 MB).
 
           SHA-256 of ``Cuelight.exe``: ``$($env:HASH)``
+
+          The open-source licenses of everything inside it are listed in [THIRD-PARTY-NOTICES.md](https://github.com/$($env:GITHUB_REPOSITORY)/blob/$($env:TAG)/THIRD-PARTY-NOTICES.md).
 
           Cuelight is an independent, unofficial project. It is not affiliated with or endorsed by Anthropic. A very large majority of it was made with Claude Code.
           "@ | Out-File notes.md -Encoding utf8

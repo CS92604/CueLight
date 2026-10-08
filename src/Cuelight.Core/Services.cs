@@ -13,6 +13,17 @@ public interface IScreenCapture
     (byte[] Bgra, int Width, int Height) GrabBgra(Region region);
 }
 
+/// <summary>Turns the pixels of a screen region into the words written on them. The Windows implementation uses Windows' own
+/// text recognition, so it runs on this PC and sends nothing anywhere.</summary>
+public interface ITextReader
+{
+    /// <summary>False when this PC can't read text from pictures (not Windows, or no recognition language installed).</summary>
+    bool IsAvailable { get; }
+
+    /// <summary>The text in the pixels, one line of text per line, top to bottom. Empty if there is none.</summary>
+    Task<string> ReadAsync(byte[] bgra, int width, int height, CancellationToken ct);
+}
+
 /// <summary>Watches one region and reports when it has changed and settled.</summary>
 public interface IScreenWatcher : IDisposable
 {

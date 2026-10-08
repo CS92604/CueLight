@@ -1,0 +1,48 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting it. **Don't paste your API key.** Check anything you attach for private conversation text.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: Steps to reproduce help a lot.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Release
+      description: The release you downloaded, for example v0.2.0.
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: For example Windows 11 23H2, 64-bit. Say if it's an ARM PC.
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: AI provider and model
+      description: For example Claude Sonnet 5.5, ChatGPT GPT-6.1 Sol, or Other (Ollama, llama3).
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        The end of `%LOCALAPPDATA%\Cuelight\logs\app.log`. It holds errors and facts about the PC, never what was said or shown,
+        and keys are blanked out, but have a look before posting. The output of `Cuelight.exe --self-test --out C:\temp\check`
+        (the `self-test.txt` it writes) helps with sound, screen or speech problems.
+      render: text
+  - type: textarea
+    id: shots
+    attributes:
+      label: Screenshots
+      description: With "Hide from screen sharing" on, screenshots of the app come out blank; turn it off first.

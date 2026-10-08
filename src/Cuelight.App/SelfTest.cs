@@ -10,7 +10,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
-using Avalonia.Threading;
 using NAudio.Wave;
 
 namespace Cuelight.App;
@@ -26,6 +25,7 @@ namespace Cuelight.App;
 /// someone's PC. It never contacts Claude and sends nothing anywhere (except the one-time speech
 /// model download, as in normal use).
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows10.0.14393.0")]
 internal static class SelfTest
 {
     public static bool Active { get; private set; }
@@ -51,11 +51,14 @@ internal static class SelfTest
             Line("Forcing the build for CPUs without AVX.");
         }
 
+        #pragma warning disable IL3000   // an empty Location is exactly how a single-file app is recognised here
         Line($"Running as: {Environment.ProcessPath} · single file: {string.IsNullOrEmpty(typeof(SelfTest).Assembly.Location)}");
+#pragma warning restore IL3000
         Step("speech engine", () => Speech(Arg(args, "--wav"), Arg(args, "--expect"), args.Contains("--require-vc")), essential: true);
         Step("audio system", AudioSystem, essential: true);   // works with no sound device at all
         Step("sound devices", Audio, essential: false);       // a CI machine has none
         Step("screen capture", ScreenCapture, essential: true);
+        Step("text recognition", TextRecognition, essential: false);   // needs a Windows recognition language; a CI machine may lack one
 
         int ui = 0;
         try { ui = Program.BuildAvaloniaApp(softwareRendering: true).StartWithClassicDesktopLifetime(args); }
@@ -203,6 +206,44 @@ internal static class SelfTest
         Line($"ok    screen capture as a PNG: {png.Length} bytes");
     }
 
+    /// <summary>Fast screen reading: draws a few lines of text (dark on light, then light on dark, as in a dark-mode chat) and checks
+    /// that Windows' text recognition reads them, noting how long it takes.</summary>
+    private static void TextRecognition()
+    {
+        var reader = new WindowsTextReader();
+        if (!reader.IsAvailable)
+        {
+            Line("note  text recognition isn't installed for this PC's language (Fast screen reading would send a picture instead)");
+            return;
+        }
+        foreach (var (name, ink, paper) in new[] { ("dark on light", System.Drawing.Color.Black, System.Drawing.Color.White), ("light on dark", System.Drawing.Color.White, System.Drawing.Color.FromArgb(32, 28, 48)) })
+        {
+            using var bmp = new System.Drawing.Bitmap(560, 110, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using (var g = System.Drawing.Graphics.FromImage(bmp))
+            {
+                g.Clear(paper);
+                using var font = new System.Drawing.Font("Segoe UI", 16);
+                using var brush = new System.Drawing.SolidBrush(ink);
+                g.DrawString("Alex: Can you start on Monday morning?", font, brush, 12, 14);
+                g.DrawString("Sam: I think so, let me check my calendar", font, brush, 12, 58);
+            }
+            var rect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);
+            var data = bmp.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            var pixels = new byte[data.Stride * bmp.Height];
+            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, pixels, 0, pixels.Length);
+            bmp.UnlockBits(data);
+
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var first = reader.ReadAsync(pixels, bmp.Width, bmp.Height, CancellationToken.None).GetAwaiter().GetResult();
+            long firstMs = clock.ElapsedMilliseconds;
+            clock.Restart();
+            reader.ReadAsync(pixels, bmp.Width, bmp.Height, CancellationToken.None).GetAwaiter().GetResult();
+            Line($"ok    text recognition read {name} text in {firstMs} ms, then {clock.ElapsedMilliseconds} ms: \"{first.Replace('\n', '/')}\"");
+            foreach (var word in new[] { "Monday", "calendar" })
+                if (!first.Contains(word, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException($"{name}: expected the read-out text to contain \"{word}\"");
+        }
+    }
+
     // -- the windows ----------------------------------------------------------------------------
 
     /// <summary>Runs inside the app: shows the real windows, saves what they look like, checks them.</summary>
@@ -285,15 +326,15 @@ internal static class SelfTest
                     outline.Show(area);
                     await Task.Delay(500);
                     var (bgra, w, h) = new GdiScreenCapture().GrabBgra(new Region(area.Left - margin, area.Top - margin, area.Width + 2 * margin, area.Height + 2 * margin));
-                    bool Orange(int x, int y)
+                    bool Outline(int x, int y)
                     {
                         int i = (y * w + x) * 4;
-                        return Math.Abs(bgra[i] - 0x57) <= 6 && Math.Abs(bgra[i + 1] - 0x77) <= 6 && Math.Abs(bgra[i + 2] - 0xD9) <= 6;
+                        return Math.Abs(bgra[i] - RegionOutline.ColorB) <= 6 && Math.Abs(bgra[i + 1] - RegionOutline.ColorG) <= 6 && Math.Abs(bgra[i + 2] - RegionOutline.ColorR) <= 6;
                     }
                     int midX = margin + area.Width / 2, midY = margin + area.Height / 2;
                     int right = margin + area.Width, bottom = margin + area.Height;
                     var problems = new List<string>();
-                    void Expect(bool want, string what, int x, int y) { if (Orange(x, y) != want) problems.Add($"{what} at ({x},{y}) should {(want ? "" : "not ")}be orange"); }
+                    void Expect(bool want, string what, int x, int y) { if (Outline(x, y) != want) problems.Add($"{what} at ({x},{y}) should {(want ? "" : "not ")}be the outline colour"); }
                     for (int d = 1; d <= RegionOutline.Thickness; d++)
                     {
                         Expect(true, "left bar", margin - d, midY);

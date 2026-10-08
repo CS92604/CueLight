@@ -5,7 +5,7 @@ using System.Runtime.Versioning;
 namespace Cuelight.App.Platform;
 
 /// <summary>
-/// Solid orange rectangles floating above everything, made directly with Windows. They draw the outline
+/// Solid blue rectangles floating above everything, made directly with Windows. They draw the outline
 /// around the watched text area.
 ///
 /// Why not ordinary Avalonia windows: Windows keeps a normal top-level window above a minimum size (about
@@ -19,7 +19,8 @@ namespace Cuelight.App.Platform;
 internal sealed class NativeBars : IDisposable
 {
     private const string ClassName = "Cuelight.Outline";
-    private const uint Orange = 0x5777D9; // #D97757 as a Windows colour (blue, green, red)
+    // The outline colour as a Windows colour, which is stored blue, green, red.
+    private const uint Blue = (uint)(Views.RegionOutline.ColorB << 16 | Views.RegionOutline.ColorG << 8 | Views.RegionOutline.ColorR);
 
     private static readonly object Gate = new();
     private static bool _registered;
@@ -55,13 +56,6 @@ internal sealed class NativeBars : IDisposable
         }
     }
 
-    /// <summary>Where each bar really is on screen, as Windows reports it (used by the self-test).</summary>
-    public IEnumerable<(int X, int Y, int Width, int Height)> ActualBounds()
-    {
-        foreach (var h in _windows)
-            if (GetWindowRect(h, out var r)) yield return (r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top);
-    }
-
     public void Dispose()
     {
         foreach (var h in _windows) DestroyWindow(h);
@@ -80,7 +74,7 @@ internal sealed class NativeBars : IDisposable
                 cbSize = (uint)Marshal.SizeOf<WndClassEx>(),
                 lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_proc),
                 hInstance = GetModuleHandleW(null),
-                hbrBackground = CreateSolidBrush(Orange),
+                hbrBackground = CreateSolidBrush(Blue),
                 lpszClassName = ClassName,
             };
             if (RegisterClassExW(ref cls) == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -115,9 +109,6 @@ internal sealed class NativeBars : IDisposable
         public IntPtr hIconSm;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct Rect { public int Left, Top, Right, Bottom; }
-
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern ushort RegisterClassExW(ref WndClassEx cls);
 
@@ -139,10 +130,6 @@ internal sealed class NativeBars : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
 
     [DllImport("gdi32.dll")]
     private static extern IntPtr CreateSolidBrush(uint color);

@@ -8,9 +8,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Styling;
-using Avalonia.Threading;
 using Avalonia.VisualTree;
-using Xunit;
 
 namespace Cuelight.App.Tests;
 
@@ -23,8 +21,6 @@ public class LayoutTests
 {
     static readonly string ShotDir = Environment.GetEnvironmentVariable("SCREENSHOT_DIR")
         ?? Path.Combine(AppContext.BaseDirectory, "screenshots");
-
-    static readonly double[] Scales = { 1.0, 1.25, 1.5, 2.0, 2.5 };
 
     // -- helpers ---------------------------------------------------------------------------------
 

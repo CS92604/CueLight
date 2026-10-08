@@ -31,7 +31,7 @@
         <StackPanel Spacing="10">
           <TextBlock Classes="eyebrow" Text="AI PROVIDER" />
           <StackPanel Spacing="8" Background="Transparent"
-                      ToolTip.Tip="Whose AI writes the suggestions: Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google), Grok (xAI), or any other service that speaks the OpenAI chat API. Each provider has its own key, saved separately, so switching back to one you already set up needs nothing more.">
+                      ToolTip.Tip="Whose AI writes the suggestions: Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google), Grok (xAI), NVIDIA (has a free key), or any other service that speaks the OpenAI chat API. Each provider has its own key, saved separately, so switching back to one you already set up needs nothing more.">
             <ListBox Classes="segmented" ItemsSource="{x:Static vm:SettingsViewModel.ProviderItems}" SelectedIndex="{Binding ProviderIndex}" />
             <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{Binding ProviderBlurb}" />
           </StackPanel>
@@ -149,6 +149,25 @@
               <ToggleSwitch Grid.Column="1" IsChecked="{Binding ThinkFirst}" OnContent="" OffContent="" Margin="12,0,-12,0" VerticalAlignment="Center" />
             </Grid>
           </Border>
+        </StackPanel>
+
+        <!-- Text area -->
+        <StackPanel Spacing="10">
+          <TextBlock Classes="eyebrow" Text="READING THE TEXT AREA" />
+          <ListBox Classes="choices" ItemsSource="{x:Static vm:SettingsViewModel.ScreenItems}" SelectedItem="{Binding SelectedScreen}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ScreenChoice">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" MinWidth="64" />
+                  <TextBlock Grid.Column="1" Text="{Binding Blurb}" Classes="muted small" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBlock Classes="small" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" IsVisible="{Binding TextReadingMissing}"
+                     Text="Windows has no text recognition installed for your language, so a picture is sent instead." />
+          <TextBlock Classes="faint small" TextWrapping="Wrap"
+                     Text="What the AI gets for the text area when Type is on. The conversation is always sent as text." />
         </StackPanel>
 
         <!-- Privacy -->

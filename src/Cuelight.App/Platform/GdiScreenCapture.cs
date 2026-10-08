@@ -103,4 +103,8 @@ public static class PlatformServices
 {
     public static IScreenCapture CreateScreenCapture() =>
         OperatingSystem.IsWindows() ? new GdiScreenCapture() : new UnsupportedScreenCapture();
+
+    /// <summary>Windows' own text recognition, or null where there is none (then the text area is sent as a picture).</summary>
+    public static ITextReader? CreateTextReader() =>
+        OperatingSystem.IsWindowsVersionAtLeast(10, 0, 14393) ? new WindowsTextReader() : null;
 }

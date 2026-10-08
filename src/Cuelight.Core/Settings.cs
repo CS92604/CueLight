@@ -9,6 +9,10 @@ public enum Tone { Warm, Neutral, Direct, Diplomatic, Confident }
 public enum ReplyLength { Brief, Short, Detailed }
 public enum SpeechAccuracy { Fast, Balanced, Accurate }
 
+/// <summary>How the watched text area reaches the AI. Fast: the words on it are read on this PC and only that text is
+/// sent. Detailed: a picture of it is sent, so the AI also sees layout, colours and who wrote what.</summary>
+public enum ScreenReading { Fast, Detailed }
+
 /// <summary>User preferences. Saved as JSON; applies to the next suggestion.</summary>
 public sealed class Settings
 {
@@ -45,6 +49,9 @@ public sealed class Settings
     /// <summary>Windows only: keep every window of the app out of screen captures and screen shares.</summary>
     public bool HideFromCapture { get; set; }
     public SpeechAccuracy SpeechAccuracy { get; set; } = SpeechAccuracy.Balanced;
+    /// <summary>What is sent for the watched text area: its words (read on this PC) or a picture of it. Detailed unless
+    /// chosen, which is also what a settings file from before the choice existed means.</summary>
+    public ScreenReading ScreenReading { get; set; } = ScreenReading.Detailed;
 
     /// <summary>
     /// Settings for a first launch. A PC with few processor cores gets the fastest speech model, so
@@ -83,6 +90,7 @@ public sealed class Settings
         if (!Enum.IsDefined(Tone)) s.Tone = Tone.Warm;
         if (!Enum.IsDefined(Length)) s.Length = ReplyLength.Short;
         if (!Enum.IsDefined(SpeechAccuracy)) s.SpeechAccuracy = SpeechAccuracy.Balanced;
+        if (!Enum.IsDefined(ScreenReading)) s.ScreenReading = ScreenReading.Detailed;
         return s;
     }
 
@@ -146,7 +154,7 @@ public sealed class Settings
 }
 
 /// <summary>The Claude models the app offers.</summary>
-public sealed record ModelChoice(string Id, string Name, string Blurb, string Tip = "");
+public sealed record ModelChoice(string Id, string Name, string Blurb, string Tip = "", bool SeesPictures = true);
 
 public static class Models
 {

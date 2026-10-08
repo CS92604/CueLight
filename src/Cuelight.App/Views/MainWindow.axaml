@@ -174,7 +174,7 @@
             </Button>
           </Grid>
           <Border IsVisible="{Binding !HasSections}" Padding="4,6">
-            <TextBlock Classes="title muted" FontStyle="Italic" FontSize="19" TextWrapping="Wrap" LineHeight="28" Foreground="{DynamicResource TextFaint}"
+            <TextBlock Classes="title muted" FontSize="17" TextWrapping="Wrap" LineHeight="26" Foreground="{DynamicResource TextFaint}"
                        Text="{Binding EmptyHint}" />
           </Border>
           <ItemsControl ItemsSource="{Binding Sections}">

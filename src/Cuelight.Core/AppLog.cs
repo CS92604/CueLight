@@ -1,11 +1,13 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Cuelight.Core;
 
 /// <summary>
 /// A small rolling log (about 1 MB at most) in the app's data folder, so a problem on someone's PC
 /// can be diagnosed afterwards. It records errors and start-up facts about the machine, never what
-/// was said, what was on screen, or the API key. Logging never throws.
+/// was said, what was on screen, or the API key (anything that looks like a key or a password is blanked out
+/// before it is written, since people paste this file into bug reports). Logging never throws.
 /// </summary>
 public static class AppLog
 {
@@ -21,8 +23,21 @@ public static class AppLog
     public static void Warn(string message) => Write("WARN ", message);
     public static void Error(string context, Exception ex) => Write("ERROR", $"{context}: {ex}");
 
+    /// <summary>Blanks out anything in a log line that looks like an API key, a bearer token, a key in a web
+    /// address, or a password in one.</summary>
+    public static string Redact(string text) => Secrets.Aggregate(text, (t, rule) => rule.Pattern.Replace(t, rule.Replacement));
+
+    private static readonly (Regex Pattern, string Replacement)[] Secrets =
+    {
+        (new(@"\b(sk-ant-|sk-|xai-|nvapi-|gsk_|AIza|pplx-|hf_)[A-Za-z0-9_\-]{12,}", RegexOptions.Compiled), "$1[hidden]"),
+        (new(@"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9._~+/\-]{8,}=*", RegexOptions.Compiled), "$1 [hidden]"),
+        (new(@"(?i)([?&](?:key|api[_-]?key|access[_-]?token|token|secret)=)[^&\s""'>]+", RegexOptions.Compiled), "$1[hidden]"),
+        (new(@"(?i)(\bhttps?://)[^/\s:@]+:[^@\s/]+@", RegexOptions.Compiled), "$1[hidden]@"),
+    };
+
     private static void Write(string level, string message)
     {
+        message = Redact(message);
         try
         {
             lock (Gate)

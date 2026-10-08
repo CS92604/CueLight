@@ -262,8 +262,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Set(StatusKind.Error, text);
     }
 
-    public void SetIdle(string text) => Set(StatusKind.Idle, text);
-
     private void Set(StatusKind kind, string text)
     {
         Status = kind;

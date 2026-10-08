@@ -82,6 +82,18 @@ public class ReadmeNoticeTests
     }
 
     [Fact]
+    public void The_project_has_the_MIT_license_and_the_readme_points_to_it()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Cuelight.sln"))) dir = dir.Parent;
+        var license = File.ReadAllText(Path.Combine(dir!.FullName, "LICENSE"));
+        Assert.StartsWith("MIT License", license);
+        Assert.Contains("Permission is hereby granted, free of charge", license);
+        Assert.Contains("THE SOFTWARE IS PROVIDED \"AS IS\"", license);
+        Assert.Contains("[MIT](LICENSE)", Readme());
+    }
+
+    [Fact]
     public void The_top_of_the_readme_says_it_was_made_with_Claude_Code()
     {
         var top = string.Join("\n", Readme().Split('\n').Take(10));

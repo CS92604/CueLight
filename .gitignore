@@ -5,3 +5,8 @@ publish/
 .vs/
 screenshots/
 TestResults/
+.idea/
+.DS_Store
+*.suo
+selftest*/
+*.log
