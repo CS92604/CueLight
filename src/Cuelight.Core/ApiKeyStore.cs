@@ -29,17 +29,22 @@ public sealed class UserOnlyFileProtector : IKeyProtector
     public byte[] Unprotect(byte[] data) => data;
 }
 
-/// <summary>Stores the user's Claude API key on disk, protected for the current user.</summary>
+/// <summary>Stores an API key on disk, protected for the current user. One file per key.</summary>
 public sealed class ApiKeyStore
 {
     private readonly string _path;
     private readonly IKeyProtector _protector;
 
-    public ApiKeyStore(string? directory = null, IKeyProtector? protector = null)
+    /// <param name="fileName">The Claude key's file keeps its original name, so a key saved by an earlier version still opens.</param>
+    public ApiKeyStore(string? directory = null, IKeyProtector? protector = null, string fileName = "api-key.bin")
     {
-        _path = Path.Combine(directory ?? AppPaths.ConfigDirectory, "api-key.bin");
+        _path = Path.Combine(directory ?? AppPaths.ConfigDirectory, fileName);
         _protector = protector ?? DefaultProtector();
     }
+
+    /// <summary>The file a provider's key is kept in.</summary>
+    public static string FileNameFor(Provider provider) =>
+        provider == Provider.Claude ? "api-key.bin" : $"api-key-{provider.ToString().ToLowerInvariant()}.bin";
 
     private static IKeyProtector DefaultProtector() =>
         OperatingSystem.IsWindows() ? new DpapiProtector() : new UserOnlyFileProtector();

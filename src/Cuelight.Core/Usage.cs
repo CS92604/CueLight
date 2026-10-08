@@ -1,10 +1,10 @@
 namespace Cuelight.Core;
 
-/// <summary>What one request used, as the Claude API reported it.</summary>
+/// <summary>What one request used, as the provider's API reported it.</summary>
 /// <param name="Input">Input tokens billed at the full price (the part that wasn't cached).</param>
 /// <param name="CacheWrite">Input tokens stored in the cache by this request (billed a little above full price).</param>
 /// <param name="CacheRead">Input tokens served from the cache (billed at a fraction of full price).</param>
-/// <param name="Output">Tokens Claude wrote, including any it thought through first.</param>
+/// <param name="Output">Tokens the AI wrote, including any it thought through first.</param>
 public sealed record TokenUsage(string Model, long Input, long CacheWrite, long CacheRead, long Output)
 {
     public long TotalInput => Input + CacheWrite + CacheRead;
@@ -18,18 +18,34 @@ public sealed record ModelPrice(decimal Input, decimal CacheWrite, decimal Cache
 }
 
 /// <summary>
-/// Anthropic's published prices for the models the app offers (the 5-minute cache, which is the one the
-/// app uses). The figure the app shows is an estimate from these; the Claude Console has the exact bill.
+/// The providers' published prices for the models the app offers. The figure the app shows is an estimate from these;
+/// the provider's own dashboard has the exact bill. A model that isn't listed (any model id can be typed in) is still
+/// counted, in tokens, and the total says it is incomplete.
 /// </summary>
 public static class Pricing
 {
-    // platform.claude.com/docs/en/about-claude/pricing, checked October 2026.
+    // Claude: platform.claude.com/docs/en/about-claude/pricing, checked October 2026 (the 5-minute cache, which is the
+    // one the app uses). The others were read from each provider's pricing page in October 2026. They remember a repeated
+    // front part of a request on their own and bill it at the cached rate; their usage reports no separate "cache write",
+    // so that column is never used for them.
     private static readonly (string Id, ModelPrice Price)[] Table =
     {
         ("claude-opus-5-5",   new(4m,    5m,     0.20m, 20m)),
         ("claude-sonnet-5-5", new(2m,    2.50m,  0.10m, 10m)),
         ("claude-haiku-5-5",  new(0.10m, 0.125m, 0.01m, 0.50m)),   // for prompts up to 100,000 tokens, which the app never exceeds
         ("claude-haiku-4-5",  new(1m,    1.25m,  0.10m, 5m)),
+
+        ("gpt-6-astra",       new(10m,   10m,    1m,    50m)),      // up to 272K tokens of prompt, which the app never exceeds
+        ("gpt-6.1-sol",       new(2m,    2m,     0.10m, 10m)),
+        ("gpt-6-luna",        new(0.10m, 0.10m,  0.01m, 0.50m)),
+
+        // Gemini 3.8 Flash costs $0.75 / $3.75 until the end of 2026; the standard price from 2027 is used, so the estimate
+        // is never too low. Google's cached-input rate wasn't confirmed, so cached tokens are counted at the full price.
+        ("gemini-3.8-flash",  new(1.50m, 1.50m,  1.50m, 7.50m)),
+        ("gemini-3.1-pro",    new(2m,    2m,     2m,    12m)),      // prompts up to 200K tokens
+
+        ("grok-4.7",          new(2m,    2m,     0.50m, 6m)),      // up to 200K tokens of prompt
+        ("grok-4.3",          new(1.25m, 1.25m,  0.20m, 2.50m)),
     };
 
     /// <summary>The price for a model id (a dated id like <c>claude-haiku-4-5-20251001</c> counts as its base id).</summary>
@@ -48,7 +64,7 @@ public static class Pricing
     }
 }
 
-/// <summary>A point-in-time total of what the Claude requests of this session used.</summary>
+/// <summary>A point-in-time total of what the AI requests of this session used.</summary>
 public sealed record UsageSnapshot(int Requests, long Input, long CacheWrite, long CacheRead, long Output, decimal Cost, bool Unpriced)
 {
     public long TotalInput => Input + CacheWrite + CacheRead;

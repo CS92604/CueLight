@@ -70,13 +70,20 @@ public partial class App : Application
 
     private void ShowWelcome(IClassicDesktopStyleApplicationLifetime desktop)
     {
-        var entry = new KeyEntryViewModel();
+        var settings = _host!.Settings;
+        var entry = new KeyEntryViewModel
+        {
+            Provider = settings.Provider,   // after a key was removed, the same provider is offered again
+            BaseUrl = settings.BaseUrl,
+            ModelId = settings.Provider == Provider.Other ? settings.Model : "",
+        };
         var welcome = new OnboardingWindow { DataContext = entry };
         var previous = desktop.MainWindow;
         entry.Accepted = key =>
         {
-            _host!.SetKey(key);
-            ShowMain(desktop); // closes this window once the assistant is up
+            _host.UseProvider(entry.Provider, entry.BaseUrl, entry.ModelId);
+            _host.SetKey(entry.Provider, key);
+            ShowMain(desktop); // closes this window once the app is up
         };
         desktop.MainWindow = welcome;
         welcome.Show();

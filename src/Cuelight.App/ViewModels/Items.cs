@@ -25,7 +25,7 @@ public sealed partial class OptionVm : ObservableObject
     }
 
     public string Text { get; }
-    /// <summary>False while Claude is still writing this option.</summary>
+    /// <summary>False while the AI is still writing this option.</summary>
     public bool IsComplete { get; }
 
     [ObservableProperty]
@@ -44,7 +44,7 @@ public sealed partial class OptionVm : ObservableObject
     }
 }
 
-/// <summary>A SAY, ANSWER or TYPE group of options (or a plain note from Claude).</summary>
+/// <summary>A SAY, ANSWER or TYPE group of options (or a plain note from the AI).</summary>
 public sealed class SectionVm
 {
     public SectionVm(SectionKind kind, IEnumerable<OptionVm> options)

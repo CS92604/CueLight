@@ -24,8 +24,16 @@ public sealed class Settings
     /// <summary>Free text: who the user is, words to avoid, background for the conversation.</summary>
     public string CustomInstructions { get; set; } = "";
 
+    /// <summary>Whose AI answers. Claude unless the user chose another provider; a settings file from before the choice existed
+    /// has no value and so means Claude.</summary>
+    public Provider Provider { get; set; } = Provider.Claude;
+    /// <summary>The model for the current provider (an id like <c>claude-sonnet-5-5</c> or <c>gpt-6.1-sol</c>).</summary>
     public string Model { get; set; } = Models.Default;
-    /// <summary>Let Claude think before it replies: slower to start, better on hard questions. Off by default,
+    /// <summary>The address of an OpenAI-style service, used when the provider is <see cref="Provider.Other"/>.</summary>
+    public string BaseUrl { get; set; } = "";
+    /// <summary>The model last used with each provider (by provider name), so switching back finds it again.</summary>
+    public Dictionary<string, string> ProviderModels { get; set; } = new();
+    /// <summary>Let the AI think before it replies: slower to start, better on hard questions. Off by default,
     /// because in a live conversation the first words of a reply matter more.</summary>
     public bool ThinkFirst { get; set; }
     public bool UseMicrophone { get; set; }
@@ -47,13 +55,29 @@ public sealed class Settings
 
     public Settings Clone() => (Settings)MemberwiseClone();
 
+    /// <summary>Switch to another provider, remembering the model of the one being left and restoring the one last used
+    /// with the new provider (or its default).</summary>
+    public void UseProvider(Provider provider)
+    {
+        if (provider == Provider) return;
+        ProviderModels ??= new();
+        ProviderModels[Provider.ToString()] = Model;
+        Provider = provider;
+        Model = ProviderModels.TryGetValue(provider.ToString(), out var remembered) && !string.IsNullOrWhiteSpace(remembered)
+            ? remembered
+            : Providers.Get(provider).DefaultModel;
+    }
+
     public Settings Normalized()
     {
         var s = Clone();
         s.Options = Math.Clamp(s.Options, 1, 3);
         s.ReplyLanguage = (s.ReplyLanguage ?? "").Trim();
         s.CustomInstructions = (s.CustomInstructions ?? "").Trim();
-        s.Model = Models.Resolve(s.Model);
+        if (!Enum.IsDefined(Provider)) s.Provider = Provider.Claude;
+        s.Model = Providers.ResolveModel(s.Provider, s.Model);
+        s.BaseUrl = (s.BaseUrl ?? "").Trim();
+        s.ProviderModels ??= new();
         if (!Enum.IsDefined(Professionalism)) s.Professionalism = Professionalism.Professional;
         if (!Enum.IsDefined(Proficiency)) s.Proficiency = Proficiency.Fluent;
         if (!Enum.IsDefined(Tone)) s.Tone = Tone.Warm;

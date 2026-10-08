@@ -115,7 +115,7 @@ public static class RegionPicker
                 IsHitTestVisible = false,
                 Child = new TextBlock
                 {
-                    Text = "Drag over the text you want Claude to watch  ·  Esc to cancel",
+                    Text = "Drag over the text you want watched  ·  Esc to cancel",
                     Foreground = Brushes.White,
                     FontSize = 13,
                 },

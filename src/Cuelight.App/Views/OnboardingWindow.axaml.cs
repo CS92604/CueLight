@@ -30,7 +30,8 @@ public partial class OnboardingWindow : Window
 
     private void OnGetKey(object? sender, RoutedEventArgs e)
     {
-        try { Process.Start(new ProcessStartInfo("https://console.anthropic.com/settings/keys") { UseShellExecute = true }); }
+        if (DataContext is not ViewModels.KeyEntryViewModel { Info.HasKeyPage: true } vm) return;
+        try { Process.Start(new ProcessStartInfo(vm.Info.KeyUrl) { UseShellExecute = true }); }
         catch { /* no default browser registered */ }
     }
 }

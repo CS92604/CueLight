@@ -351,6 +351,64 @@ public class LayoutTests
         w.Close();
     }
 
+    [AvaloniaTheory]
+    [InlineData(1.0)] [InlineData(1.5)] [InlineData(2.5)]
+    public void Welcome_screen_for_another_service_fits_and_scrolls_on_a_short_screen(double scale)
+    {
+        var entry = new KeyEntryViewModel { Provider = Provider.Other, BaseUrl = "https://openrouter.ai/api/v1", ModelId = "meta-llama/llama-3.3-70b-instruct" };
+        var w = new OnboardingWindow { DataContext = entry, Height = 420 };
+        w.Show();
+        SetScale(w, scale);
+        UiTests.Settle();
+        AllInside(w, $"welcome (other service) at {scale * 100:0}%");
+        var scroller = Shown<ScrollViewer>(w).First();
+        Assert.True(scroller.Extent.Height <= scroller.Viewport.Height || scroller.VerticalScrollBarVisibility != Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled);
+        Save(w, $"welcome-other-short-{scale * 100:0}");
+        w.Close();
+    }
+
+    [AvaloniaFact]
+    public void Welcome_screen_keeps_its_even_gaps_for_every_provider()
+    {
+        foreach (var provider in Enum.GetValues<Provider>())
+        {
+            var entry = new KeyEntryViewModel { Provider = provider };
+            var w = new OnboardingWindow { DataContext = entry };
+            w.Show();
+            UiTests.Settle();
+            double width = w.ClientSize.Width;
+            foreach (var c in Shown<TextBox>(w).Cast<Control>().Concat(Shown<Button>(w).Where(b => Has(b, "primary"))))
+            {
+                Near(52, Box(c, w).Left, $"{provider}: {c.GetType().Name}'s left gap");
+                Near(52, width - Box(c, w).Right, $"{provider}: {c.GetType().Name}'s right gap");
+            }
+            foreach (var t in Shown<TextBlock>(w))
+                Assert.True(Box(t, w).Right <= width - 52 + 0.5, $"{provider}: text runs past the right margin: {t.Text}");
+            AllInside(w, $"welcome for {provider}");
+            w.Close();
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(1.0)] [InlineData(2.5)]
+    public void Settings_stays_inside_the_window_for_every_provider(double scale)
+    {
+        foreach (var provider in Enum.GetValues<Provider>())
+        {
+            var w = MakeSettings();
+            var vm = (SettingsViewModel)w.DataContext!;
+            vm.ProviderIndex = (int)provider;
+            if (provider == Provider.Other) { vm.BaseUrl = "https://openrouter.ai/api/v1"; vm.ModelId = "llama-3.3-70b"; }
+            w.Width = w.MinWidth;
+            w.Height = w.MinHeight;
+            SetScale(w, scale);
+            UiTests.Settle();
+            AllInside(w, $"settings for {provider} at {scale * 100:0}%");
+            if (scale == 1.0) Save(w, $"settings-{provider.ToString().ToLowerInvariant()}-min");
+            w.Close();
+        }
+    }
+
     // -- pictures for a person to look at ----------------------------------------------------------
 
     [AvaloniaTheory]

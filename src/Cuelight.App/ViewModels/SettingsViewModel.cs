@@ -17,22 +17,33 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly Settings _s;
     private readonly Action _changed;
 
-    public SettingsViewModel(Settings settings, Action changed, KeyEntryViewModel keyEntry, string? currentKey, Action<string?> keyChanged)
+    /// <param name="currentKey">The saved key of the current provider.</param>
+    /// <param name="keyChanged">Called with a new key for the current provider, or null when it is removed.</param>
+    /// <param name="keyFor">The saved key of any provider, for when the provider is switched here.</param>
+    public SettingsViewModel(Settings settings, Action changed, KeyEntryViewModel keyEntry, string? currentKey, Action<string?> keyChanged,
+        Func<Provider, string?>? keyFor = null)
     {
         _s = settings;
         _changed = changed;
         KeyEntry = keyEntry;
         _keyChanged = keyChanged;
-        _maskedKey = currentKey is null ? "No key saved" : ApiKeyStore.Mask(currentKey);
+        var startedWith = settings.Provider;
+        _keyFor = keyFor ?? (p => p == startedWith ? currentKey : null);
+        _maskedKey = currentKey is null ? NoKeyText : ApiKeyStore.Mask(currentKey);
+        keyEntry.Provider = settings.Provider;
+        keyEntry.BaseUrl = settings.BaseUrl;
+        keyEntry.ModelId = settings.Model;
         keyEntry.Accepted = key =>
         {
-            MaskedKey = ApiKeyStore.Mask(key);
+            MaskedKey = key == ProviderKeys.NoKey ? "No key needed" : ApiKeyStore.Mask(key);
             IsEditingKey = false;
             _keyChanged(key);
         };
     }
 
     private readonly Action<string?> _keyChanged;
+    private readonly Func<Provider, string?> _keyFor;
+    private const string NoKeyText = "No key saved";
 
     public static IReadOnlyList<ChoiceItem> ProfessionalismItems { get; } = new ChoiceItem[]
     {
@@ -68,7 +79,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         new("3", "Three suggestions to choose from."),
     };
 
-    public static IReadOnlyList<ModelChoice> ModelItems => Models.All;
     public static IReadOnlyList<SpeechChoice> SpeechItems { get; } = new[]
     {
         new SpeechChoice(SpeechAccuracy.Fast, "Fast", "75 MB download, lowest accuracy",
@@ -120,11 +130,95 @@ public sealed partial class SettingsViewModel : ObservableObject
         set { _s.HideFromCapture = value && HideSupported; Changed(nameof(HideFromCapture)); }
     }
 
+    // -- provider and model -------------------------------------------------------------------
+
+    public static IReadOnlyList<ChoiceItem> ProviderItems => KeyEntryViewModel.ProviderItems;
+
+    private ProviderInfo Info => Providers.Get(_s.Provider);
+
+    public int ProviderIndex
+    {
+        get => (int)_s.Provider;
+        set
+        {
+            if (value < 0 || value >= ProviderItems.Count || (Provider)value == _s.Provider) return;
+            SwitchProvider((Provider)value);
+        }
+    }
+
+    private void SwitchProvider(Provider provider)
+    {
+        _s.UseProvider(provider);
+        KeyEntry.Provider = provider;
+        KeyEntry.Reset();
+        KeyEntry.BaseUrl = _s.BaseUrl;
+        KeyEntry.ModelId = _s.Model;
+        var key = _keyFor(provider);
+        MaskedKey = key is null ? NoKeyText : key == ProviderKeys.NoKey ? "No key needed" : ApiKeyStore.Mask(key);
+        IsEditingKey = key is null;   // nothing saved for this provider yet: ask for it right away
+        foreach (var name in new[]
+        {
+            nameof(ProviderIndex), nameof(ProviderBlurb), nameof(KeyEyebrow), nameof(KeyTip), nameof(CheckSaveTip), nameof(KeyHint),
+            nameof(ModelEyebrow), nameof(ModelItems), nameof(SelectedModel), nameof(ShowModelList), nameof(ModelId), nameof(ShowModelId),
+            nameof(ShowAddress), nameof(BaseUrl), nameof(ThinkTip), nameof(ThinkBlurb),
+        })
+            OnPropertyChanged(name);
+        _changed();
+    }
+
+    public string ProviderBlurb => Info.Blurb;
+    public string KeyEyebrow => Info.IsCustom ? "API KEY (OPTIONAL)" : $"{Info.Name.ToUpperInvariant()} API KEY";
+    public string KeyHint => Info.KeyHint;
+    public string KeyTip => Info.IsCustom
+        ? "The key for the service, if it needs one. It is stored encrypted on this PC and only ever sent to that service."
+        : $"Your {Info.Name} API key, from {Info.KeyHost}. It is stored encrypted on this PC and only ever sent to {Info.Company}.";
+    public string CheckSaveTip => Info.IsCustom ? "Check that the service answers, then save the key, encrypted, on this PC." : $"Check the key with {Info.Company}, then save it, encrypted, on this PC.";
+    public string ModelEyebrow => Info.IsCustom ? "MODEL" : $"{Info.Name.ToUpperInvariant()} MODEL";
+
+    public IReadOnlyList<ModelChoice> ModelItems => Info.Models;
+    public bool ShowModelList => Info.Models.Count > 0;
+    /// <summary>Models change often, so every provider but Claude also takes a model name typed in.</summary>
+    public bool ShowModelId => !Info.IsClaude;
+    public bool ShowAddress => Info.IsCustom;
+
     public ModelChoice? SelectedModel
     {
-        get => Models.All.FirstOrDefault(m => m.Id == _s.Model);
-        set { if (value is null) return; _s.Model = value.Id; Changed(nameof(SelectedModel)); }
+        get => Info.Models.FirstOrDefault(m => m.Id == _s.Model);
+        set
+        {
+            if (value is null) return;
+            _s.Model = value.Id;
+            KeyEntry.ModelId = _s.Model;
+            OnPropertyChanged(nameof(ModelId));
+            Changed(nameof(SelectedModel));
+        }
     }
+
+    public string ModelId
+    {
+        get => _s.Model;
+        set
+        {
+            _s.Model = (value ?? "").Trim();
+            KeyEntry.ModelId = _s.Model;
+            OnPropertyChanged(nameof(SelectedModel));
+            Changed(nameof(ModelId));
+        }
+    }
+
+    public string BaseUrl
+    {
+        get => _s.BaseUrl;
+        set
+        {
+            _s.BaseUrl = (value ?? "").Trim();
+            KeyEntry.BaseUrl = _s.BaseUrl;
+            Changed(nameof(BaseUrl));
+        }
+    }
+
+    public string ThinkTip => $"Think before replying. On: the AI spends more effort on each reply, which is slower to start but better on hard or technical questions. Off (the default): replies begin as soon as they can.";
+    public string ThinkBlurb => "Slower to start, better on hard or technical questions. Off: replies begin sooner.";
 
     public SpeechChoice? SelectedSpeech
     {
@@ -134,10 +228,10 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     // -- API key ------------------------------------------------------------------------------
 
-    [ObservableProperty] private string _maskedKey;
+    [ObservableProperty] private string _maskedKey = NoKeyText;
     [ObservableProperty] private bool _isEditingKey;
 
-    public bool HasKey => MaskedKey != "No key saved";
+    public bool HasKey => MaskedKey != NoKeyText;
 
     partial void OnMaskedKeyChanged(string value) => OnPropertyChanged(nameof(HasKey));
 
@@ -153,7 +247,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void RemoveKey()
     {
-        MaskedKey = "No key saved";
+        MaskedKey = NoKeyText;
         _keyChanged(null);
     }
 }

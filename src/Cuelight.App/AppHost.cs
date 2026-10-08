@@ -11,13 +11,12 @@ namespace Cuelight.App;
 /// <summary>Owns the long-lived pieces (settings, key, engine, audio, speech model) and the windows.</summary>
 public sealed class AppHost : IDisposable
 {
-    private readonly ApiKeyStore _keys = new();
+    private readonly ProviderKeys _keys = new();
     private readonly SettingsStore _store = new();
     private readonly SwappableSpeechToText _speech = new();
-    private readonly ClaudeSuggester _suggester;
+    private readonly ISuggester _suggester;
     private readonly RegionOutline _outline = new();
     private readonly Timer _saveTimer;
-    private string? _apiKey;
     private AudioPipeline? _pipeline;
     private IAudioSource? _mic;
     private CancellationTokenSource? _modelCts;
@@ -31,9 +30,9 @@ public sealed class AppHost : IDisposable
     public AppHost()
     {
         Settings = _store.Exists ? _store.Load() : Settings.ForFirstRun(Environment.ProcessorCount);
-        _apiKey = _keys.Load();
         Capture = PlatformServices.CreateScreenCapture();
-        _suggester = new ClaudeSuggester(() => _apiKey);
+        // Claude is called through Anthropic's SDK; every other provider through the OpenAI-style chat API.
+        _suggester = new RoutingSuggester(new ClaudeSuggester(() => _keys.Get(Provider.Claude)), new OpenAiCompatibleSuggester(_keys.Get));
         Engine = new Engine(new EngineOptions { AutoSuggest = Settings.AutoSuggest }, _suggester, Capture)
         {
             Settings = Settings,
@@ -49,29 +48,43 @@ public sealed class AppHost : IDisposable
     public Settings Settings { get; }
     public Engine Engine { get; }
     public IScreenCapture Capture { get; }
-    public bool HasKey => _apiKey is not null;
+    /// <summary>The provider in use has a saved key.</summary>
+    public bool HasKey => _keys.Has(Settings.Provider);
 
-    /// <summary>Raised after the user removes their key in Settings.</summary>
+    /// <summary>Raised after the user removes the key of the provider in use, in Settings.</summary>
     public event Action? KeyRemoved;
 
-    public void SetKey(string? key)
+    /// <summary>Saves the key of a provider, or removes it (null). Removing the key in use stops the session and brings
+    /// the welcome screen back.</summary>
+    public void SetKey(Provider provider, string? key)
     {
         if (key is null)
         {
-            _keys.Delete();
-            _apiKey = null;
+            _keys.Remove(provider);
+            if (provider != Settings.Provider) return;
             StopSession();
             KeyRemoved?.Invoke();
             return;
         }
-        _apiKey = key;
-        try { _keys.Save(key); }
+        try { _keys.Set(provider, key); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException)
         {
             // Keep going with the key for this session; just say it won't be remembered.
             AppLog.Error("Couldn't save the API key", ex);
             _vm?.SetProblem("Couldn't save your key on this PC, so you'll be asked for it again next time.");
         }
+    }
+
+    /// <summary>Use another provider from now on. For "Other", also its address and model name.</summary>
+    public void UseProvider(Provider provider, string? address = null, string? model = null)
+    {
+        Settings.UseProvider(provider);
+        if (provider == Provider.Other)
+        {
+            Settings.BaseUrl = (address ?? "").Trim();
+            Settings.Model = (model ?? "").Trim();
+        }
+        ApplySettings();
     }
 
     public MainWindow CreateMainWindow()
@@ -242,10 +255,8 @@ public sealed class AppHost : IDisposable
         if (_window is null) return;
         if (_settingsWindow is { } open) { open.Activate(); return; } // already open: don't stack a second one
         var entry = new KeyEntryViewModel();
-        var vm = new SettingsViewModel(Settings, ApplySettings, entry, _apiKey, key =>
-        {
-            SetKey(key);
-        });
+        var vm = new SettingsViewModel(Settings, ApplySettings, entry, _keys.Get(Settings.Provider),
+            key => SetKey(Settings.Provider, key), _keys.Get);
         var win = new SettingsWindow { DataContext = vm };
         KeyRemoved += CloseOnRemoved;
         _settingsWindow = win;

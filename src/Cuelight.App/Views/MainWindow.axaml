@@ -28,7 +28,7 @@
       </ToggleButton>
       <Button Grid.Column="2" Classes="icon" Command="{Binding OpenSettingsCommand}" VerticalAlignment="Center" Margin="2,0,0,0"
               AutomationProperties.Name="Settings"
-              ToolTip.Tip="Settings. Change how replies sound, which Claude model is used, privacy options and speech recognition.">
+              ToolTip.Tip="Settings. Change how replies sound, which AI provider and model is used, privacy options and speech recognition.">
         <Path Data="{StaticResource IconSliders}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.75" StrokeLineCap="Round" StrokeJoin="Round" Width="17" Height="17" Stretch="Uniform" />
       </Button>
     </Grid>
@@ -36,7 +36,7 @@
     <!-- Switches -->
     <Grid DockPanel.Dock="Top" Margin="18,0,18,10" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
       <ToggleButton Classes="pill rec" IsChecked="{Binding IsRecording}"
-                    ToolTip.Tip="Recording. On: listens to your speakers (and your microphone, if you turned that on in Settings) and, when Type is on, watches the text area. Off: nothing is heard, watched or sent to Claude.">
+                    ToolTip.Tip="Recording. On: listens to your speakers (and your microphone, if you turned that on in Settings) and, when Type is on, watches the text area. Off: nothing is heard, watched or sent to the AI.">
         <StackPanel Orientation="Horizontal" Spacing="7">
           <Ellipse Classes="pilldot" Width="8" Height="8" VerticalAlignment="Center" />
           <TextBlock Text="Recording" Foreground="{Binding $parent[ToggleButton].Foreground}" />
@@ -51,7 +51,7 @@
           <TextBlock Text="{Binding TypeEnabled, Converter={x:Static vm:Converters.OnOff}}" FontWeight="Bold" Foreground="{Binding $parent[ToggleButton].Foreground}" />
         </StackPanel>
       </ToggleButton>
-      <!-- What Claude has cost this session. Right-aligned, so it sits as far from the right edge as the first switch does from the left. -->
+      <!-- What the AI has cost this session. Right-aligned, so it sits as far from the right edge as the first switch does from the left. -->
       <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding CostText}" HorizontalAlignment="Right" VerticalAlignment="Center"
                  TextTrimming="CharacterEllipsis" Background="Transparent" Margin="12,0,0,0"
                  ToolTip.Tip="{Binding CostTip}" />
@@ -61,7 +61,7 @@
     <Border DockPanel.Dock="Bottom" Padding="18,8,18,14" Background="{DynamicResource Bg}">
       <StackPanel Spacing="8">
         <Border Classes="card composer" Padding="14,5,6,5" CornerRadius="22" BoxShadow="0 2 14 0 #14000000" IsEnabled="{Binding IsRecording}"
-                ToolTip.Tip="Optional direction for Claude, like “shorter” or “more formal”. Press Enter to get suggestions with it, or Regenerate to redo the current ones.">
+                ToolTip.Tip="Optional direction for the AI, like “shorter” or “more formal”. Press Enter to get suggestions with it, or Regenerate to redo the current ones.">
           <Grid ColumnDefinitions="*,Auto">
             <TextBox Classes="bare" Text="{Binding Hint}" Watermark="Ask for a different angle, e.g. “shorter”" VerticalAlignment="Center">
               <TextBox.KeyBindings>
@@ -75,7 +75,7 @@
         </Border>
         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
           <ToggleSwitch IsChecked="{Binding AutoSuggest}" OnContent="Auto-suggest" OffContent="Auto-suggest" FontSize="12"
-                        ToolTip.Tip="Auto-suggest. On: Claude suggests a reply by itself whenever someone speaks or the text area changes. Off: it only answers when you press Send or Panic." />
+                        ToolTip.Tip="Auto-suggest. On: the AI suggests a reply by itself whenever someone speaks or the text area changes. Off: it only answers when you press Send or Panic." />
           <Button Grid.Column="2" Classes="panic" Command="{Binding PanicCommand}" VerticalAlignment="Center"
                   IsVisible="{Binding TypeEnabled}" IsEnabled="{Binding IsRecording}"
                   ToolTip.Tip="{Binding PanicTip}">
@@ -85,7 +85,7 @@
             </StackPanel>
           </Button>
           <Button Grid.Column="3" Classes="ghost" Content="Clear chat" Command="{Binding ClearChatCommand}" Margin="4,0,-6,0" VerticalAlignment="Center"
-                  ToolTip.Tip="Clear chat. Forgets the conversation so far, including what Claude has been shown, and clears the suggestions. Use it when a new call starts." />
+                  ToolTip.Tip="Clear chat. Forgets the conversation so far, including what the AI has been shown, and clears the suggestions. Use it when a new call starts." />
         </Grid>
       </StackPanel>
     </Border>
@@ -151,7 +151,7 @@
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
               <Button Classes="secondary" Content="{Binding HasRegion, Converter={x:Static vm:Converters.SelectLabel}}" Command="{Binding SelectRegionCommand}"
-                      ToolTip.Tip="Drag a box over the exact part of the screen to watch: a chat, an email or a document. Claude only ever sees what is inside the box." />
+                      ToolTip.Tip="Drag a box over the exact part of the screen to watch: a chat, an email or a document. The AI only ever sees what is inside the box." />
               <Button Classes="icon" Command="{Binding ClearRegionCommand}" IsVisible="{Binding HasRegion}"
                       AutomationProperties.Name="Stop watching this area"
                       ToolTip.Tip="Stop watching this area. Type stays on; pick a new area whenever you like.">

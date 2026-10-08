@@ -1,7 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-  <!-- Warm neutrals, a clay accent and serif headings: the Claude look, in light and dark. -->
+  <!-- Warm neutrals, a clay accent and serif headings, in light and dark. -->
   <Styles.Resources>
     <ResourceDictionary>
       <ResourceDictionary.ThemeDictionaries>
@@ -54,8 +54,8 @@
           <SolidColorBrush x:Key="DangerSoft" Color="#4A302B" />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
-      <!-- Claude sets its writing in a serif and its interface in a sans. Source Serif 4 (SIL OFL) and
-           Inter are bundled as open stand-ins, so the look is the same on every PC. -->
+      <!-- Writing is set in a serif and the interface in a sans. Source Serif 4 (SIL OFL) and Inter are
+           bundled, so the look is the same on every PC. -->
       <FontFamily x:Key="SerifFont">avares://Cuelight/Assets/Fonts#Source Serif 4</FontFamily>
       <FontFamily x:Key="SerifDisplayFont">avares://Cuelight/Assets/Fonts#Source Serif 4 Display</FontFamily>
     </ResourceDictionary>
@@ -81,7 +81,7 @@
     <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
     <Setter Property="FontSize" Value="20" />
   </Style>
-  <!-- Claude's own words (the suggestions) are set in the serif, as in Claude's chat. -->
+  <!-- The suggestions are set in the serif. -->
   <Style Selector="TextBlock.reply">
     <Setter Property="FontFamily" Value="{StaticResource SerifFont}" />
     <Setter Property="FontSize" Value="16" />

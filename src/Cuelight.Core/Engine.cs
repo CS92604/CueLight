@@ -397,7 +397,7 @@ public sealed class Engine : IDisposable
                 {
                     // Whatever went wrong, the engine must keep serving later requests.
                     AppLog.Error("Suggestion run failed", ex);
-                    Emit(new EngineEvent(EngineEventKind.Error, ClaudeSuggester.Describe(ex)));
+                    Emit(new EngineEvent(EngineEventKind.Error, SuggesterErrors.Describe(ex)));
                     Emit(new EngineEvent(EngineEventKind.SuggestEnd));
                 }
             }
@@ -467,7 +467,7 @@ public sealed class Engine : IDisposable
         catch (Exception ex)
         {
             failed = true;
-            Emit(new EngineEvent(EngineEventKind.Error, ClaudeSuggester.Describe(ex)));
+            Emit(new EngineEvent(EngineEventKind.Error, SuggesterErrors.Describe(ex)));
         }
         Emit(new EngineEvent(EngineEventKind.SuggestEnd));
 

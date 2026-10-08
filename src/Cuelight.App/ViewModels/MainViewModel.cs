@@ -154,7 +154,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         : "Suggestions will appear here as people talk.";
 
     // What the status area shows. While recording is off it says so and goes quiet, whatever the
-    // speech model or Claude last reported; that comes back when recording does.
+    // speech model or the AI last reported; that comes back when recording does.
     public string StatusLine => !IsRecording ? PausedText : ShowHearing ? HearingText : StatusText;
 
     /// <summary>Someone is speaking right now, so the status says LISTENING. Problems and set-up messages still win.</summary>
@@ -167,7 +167,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     // Hover text for the buttons Recording turns off: when it's off they say why.
     public string SendTip => IsRecording
-        ? "Get suggestions now. Claude replies to what has been said (and to the text area, if Type is on). Anything typed in the box is used as direction."
+        ? "Get suggestions now. The AI replies to what has been said (and to the text area, if Type is on). Anything typed in the box is used as direction."
         : "Recording is off. Turn it on to get suggestions.";
 
     public string PanicTip => IsRecording
@@ -317,7 +317,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             case EngineEventKind.Usage:
                 var usage = _engine.Usage.Snapshot();
                 CostText = CostLabel(usage);
-                CostTip = CostTipFor(usage);
+                CostTip = CostTipFor(usage, Providers.Get(_settings.Provider));
                 break;
             case EngineEventKind.RegionChanged:
                 HasRegion = e.Region is not null;
@@ -330,19 +330,32 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public static string CostLabel(UsageSnapshot u)
     {
         if (u.Requests == 0) return "$0.00";
+        if (u.Cost == 0 && u.Unpriced) return Tokens(u.TotalInput + u.Output);   // no price is known for the model: count tokens instead
         var amount = u.Cost < 0.005m ? "<$0.01" : "$" + u.Cost.ToString("0.00", System.Globalization.CultureInfo.CurrentCulture);
         return "≈ " + amount + (u.Unpriced ? "+" : "");
     }
 
-    public static string CostTipFor(UsageSnapshot u)
+    private static string Tokens(long n) =>
+        n >= 1_000_000 ? $"{n / 1_000_000.0:0.#}M tokens" : n >= 1_000 ? $"{n / 1_000.0:0.#}k tokens" : $"{n} tokens";
+
+    public static string CostTipFor(UsageSnapshot u, ProviderInfo? provider = null)
     {
-        const string Exact = "Your Claude Console (console.anthropic.com) shows the exact amount, and lets you set a monthly spending limit.";
+        provider ??= Providers.Get(Provider.Claude);
+        string who = provider.IsCustom ? "the AI" : provider.Name;
+        string exact = provider.IsClaude
+            ? "Your Claude Console (console.anthropic.com) shows the exact amount, and lets you set a monthly spending limit."
+            : provider.IsCustom
+                ? "Your provider's own dashboard shows the exact amount."
+                : $"Your {provider.Company} account ({provider.KeyHost}) shows the exact amount.";
         if (u.Requests == 0)
-            return "Estimated cost of Claude's suggestions since you opened the app. Nothing has been sent yet. " + Exact;
+            return $"Estimated cost of {who}'s suggestions since you opened the app. Nothing has been sent yet. " + exact;
         var share = (int)Math.Round(u.CachedShare * 100);
-        return $"Estimated cost of Claude's suggestions since you opened the app: {u.Requests} request{(u.Requests == 1 ? "" : "s")}. "
-             + $"{share}% of what Claude read came from its memory of earlier requests, which costs far less. "
-             + "This is worked out from Anthropic's list prices. " + Exact;
+        string prices = u.Unpriced
+            ? "No price is known for some of the models used, so those are counted in tokens only and the total is incomplete. "
+            : provider.IsCustom ? "" : $"This is worked out from {provider.Company}'s list prices. ";
+        return $"Estimated cost of {who}'s suggestions since you opened the app: {u.Requests} request{(u.Requests == 1 ? "" : "s")}. "
+             + $"{share}% of what {who} read came from its memory of earlier requests, which costs far less. "
+             + prices + exact;
     }
 
     private void Render(bool final)
