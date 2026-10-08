@@ -48,7 +48,7 @@ Two switches sit at the top of the window.
   button: the screen freezes like the Snipping Tool and you drag a box over the chat, email or
   document. A thin orange outline stays around it (just outside, so it's never in what Claude
   sees). When the text changes and stops changing, Claude reads it and suggests what to **type**.
-  Keep the assistant window off the box. Switching Type off stops watching but remembers the box.
+  Keep the Cuelight window off the box. Switching Type off stops watching but remembers the box.
 
 Then:
 
