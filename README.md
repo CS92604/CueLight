@@ -7,9 +7,9 @@
 
 A small Windows app that listens to whatever your PC is playing, watches a box you draw
 around any on-screen text, and uses an AI to tell you what to **say** and what to **type**,
-in words that sound like a person. Bring your own API key for **Claude, ChatGPT, Gemini, Grok or NVIDIA** (which has a **free** key),
-or for any other service that speaks the OpenAI chat API (OpenRouter, Groq, a model running on
-your own PC with Ollama...).
+in words that sound like a person. Bring your own API key for **Claude, ChatGPT, Gemini, Grok or
+NVIDIA** (which has a **free** key), or for any other service that speaks the OpenAI chat API
+(OpenRouter, Groq, a model running on your own PC with Ollama...).
 
 <p align="center">
   <img src="docs/main-suggestions-light.png" width="300" alt="Suggestions to say and type, with Copy buttons">
